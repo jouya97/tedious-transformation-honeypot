@@ -1,0 +1,48 @@
+{
+  "checked_at": "2026-10-03T00:46:10.499234+00:00",
+  "note": "Live read-only check; final export will verify exact request prefixes and every raw body.",
+  "samples": [
+    {
+      "epoch": 1,
+      "model_events_seen": 14,
+      "raw_call_objects_present": 14,
+      "raw_calls_after_first_five": 9,
+      "call_keys_last": [
+        "request",
+        "response",
+        "error",
+        "time",
+        "call_refs",
+        "call_key"
+      ]
+    },
+    {
+      "epoch": 2,
+      "model_events_seen": 14,
+      "raw_call_objects_present": 14,
+      "raw_calls_after_first_five": 9,
+      "call_keys_last": [
+        "request",
+        "response",
+        "error",
+        "time",
+        "call_refs",
+        "call_key"
+      ]
+    },
+    {
+      "epoch": 3,
+      "model_events_seen": 15,
+      "raw_call_objects_present": 15,
+      "raw_calls_after_first_five": 10,
+      "call_keys_last": [
+        "request",
+        "response",
+        "error",
+        "time",
+        "call_refs",
+        "call_key"
+      ]
+    }
+  ]
+}

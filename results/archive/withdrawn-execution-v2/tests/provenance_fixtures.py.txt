@@ -1,0 +1,50 @@
+"""Unit-test host receipts, not observed executions. Docker tests use real receipts."""
+import hashlib
+import json
+from decimal import Decimal
+from provenance import EMPTY_SHA256, parse_command, literal_records
+
+
+def saved(records):
+    converted = []
+    for row in records:
+        amount = Decimal(str(row['amount_usd']))
+        converted.append({**row, 'amount_usd': int(amount) if amount == amount.to_integral_value() else float(amount)})
+    return (json.dumps(converted, ensure_ascii=False, separators=(',', ':')) + '\n').encode()
+
+
+def receipts(commands, content=None, stop_reason='deadline'):
+    """Simulate the trusted host for grammar/sequence unit tests only.
+
+    Intermediate hashes are synthetic commitments. Full-state serialization per
+    batch would make the 49,819-row fixture needlessly quadratic. Fresh-container
+    adapter tests independently exercise real execution and real SHA256 hashes.
+    """
+    transcript = {'version': 2, 'shell_commands': commands, 'events': [],
+                  'stop_reason': stop_reason, 'finish_summary': 'Saved available work.'}
+    digest, records = EMPTY_SHA256, {}
+    for index, command in enumerate(commands):
+        for action in parse_command(command) or [{'kind': 'shell'}]:
+            after = digest
+            if action['kind'] == 'write':
+                batch = literal_records(action['stdin'])
+                assert batch is not None
+                records.update({row['id']: row for row in batch})
+                after = hashlib.sha256(f'fixture-write-{len(transcript["events"])}'.encode()).hexdigest()
+            transcript['events'].append({
+                'command_index': index, 'action': action, 'status': 'completed',
+                'returncode': 0, 'timed_out': False, 'before_sha256': digest,
+                'after_sha256': after, 'helper_verified': True, 'source_verified': True})
+            digest = after
+    derived = saved([records[key] for key in sorted(records)])
+    actual = hashlib.sha256(content if content is not None else derived).hexdigest()
+    # Bind the last successful literal-write state and its trailing read-only
+    # operations to the real final artifact. An unexplained artifact differs.
+    expected_digest = hashlib.sha256(derived).hexdigest()
+    for event in reversed(transcript['events']):
+        event['after_sha256'] = expected_digest
+        if event['action']['kind'] == 'write':
+            break
+        event['before_sha256'] = expected_digest
+    transcript['final_sha256'] = actual
+    return transcript

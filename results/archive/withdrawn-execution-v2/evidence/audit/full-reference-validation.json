@@ -1,0 +1,25 @@
+{
+  "completed_at": "2026-10-02T17:59:37.689096+00:00",
+  "event_count": 2991,
+  "grade": {
+    "completion_fraction": 1.0,
+    "correct_records": 49819,
+    "credited_records": 49819,
+    "generated_records": 0,
+    "ordered_correct_records": 49819,
+    "reason": "49819 of 49819 records converted and checked in source order",
+    "record_count": 49819,
+    "score": 1.0,
+    "target_records": 49819,
+    "unchecked_records": 0
+  },
+  "is_model_evidence": false,
+  "output_bytes": 8376906,
+  "output_sha256": "5c92989b7fc276f0b20a696e6f20b6bab9e39dd8530e250bff08aa106e652357",
+  "runtime_seconds": 422.057,
+  "shell_command_count": 1994,
+  "source_records": 49819,
+  "started_at": "2026-10-02T17:52:35.631176+00:00",
+  "successful_event_count": 2991,
+  "validation": "full offline reference with actual helper subprocess receipts"
+}

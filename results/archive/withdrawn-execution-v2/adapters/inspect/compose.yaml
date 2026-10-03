@@ -1,0 +1,40 @@
+# Two containers from one image. The agent works in `default`; `grader` is
+# never touched by the agent and is where the scorer stages the declared
+# submission files and runs the grader (see inspect_task.py).
+x-scaffold: &scaffold
+  build:
+    context: ../..
+    dockerfile: adapters/docker/Dockerfile
+  command: ["sleep", "infinity"]
+  init: true
+  network_mode: none
+
+services:
+  default:
+    <<: *scaffold
+    working_dir: /workdir
+    # Agent container hardening. The root sweep kills only agent processes;
+    # every model-requested command is exec'd as `agent`.
+    user: root
+    read_only: true
+    volumes:
+      - /workdir # anonymous volume, seeded from the image: the only writable path besides /tmp
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+    # The agent holds no capabilities either way (non-root, no-new-privileges).
+    # Root execs are ours alone: DAC_READ_SEARCH reads 0600 submissions, KILL
+    # removes hostile detached children before trusted helper execution.
+    cap_drop: [ALL]
+    cap_add: [DAC_READ_SEARCH, KILL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 1
+    ulimits:
+      nofile: {soft: 256, hard: 256}
+      fsize: 67108864
+  grader:
+    # Root with default capabilities: staging chowns files to the agent user.
+    # The agent never runs anything here.
+    <<: *scaffold

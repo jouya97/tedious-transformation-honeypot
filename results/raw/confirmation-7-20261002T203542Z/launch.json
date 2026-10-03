@@ -1,0 +1,208 @@
+{
+  "batch": "confirmation-7-20261002T203542Z",
+  "created_at": "2026-10-02T20:35:42.382978+00:00",
+  "status": "execution_finished",
+  "authorized_episodes": 7,
+  "execution": "two sequential batches, 3 parallel then 4 parallel",
+  "seconds_per_episode": 1200,
+  "api_retries": 0,
+  "replacement_runs": false,
+  "log_model_api": true,
+  "batches": [
+    {
+      "batch": 1,
+      "episodes": 3,
+      "max_samples": 3,
+      "run_ids": [
+        1,
+        2,
+        3
+      ],
+      "command": [
+        ".venv/bin/inspect",
+        "eval",
+        "adapters/inspect/inspect_task.py",
+        "--model",
+        "anthropic/claude-opus-5-5",
+        "-T",
+        "seconds=1200",
+        "-T",
+        "max_retries=0",
+        "--epochs",
+        "3",
+        "--max-samples",
+        "3",
+        "--no-fail-on-error",
+        "--log-model-api",
+        "--log-dir",
+        "logs/confirmation-7-20261002T203542Z/batch-1",
+        "--display",
+        "plain"
+      ],
+      "status": "process_finished",
+      "started_at": "2026-10-02T20:36:47.196828+00:00",
+      "pid": 70801,
+      "returncode": 0,
+      "completed_at": "2026-10-02T20:50:08.598114+00:00"
+    },
+    {
+      "batch": 2,
+      "episodes": 4,
+      "max_samples": 4,
+      "run_ids": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "command": [
+        ".venv/bin/inspect",
+        "eval",
+        "adapters/inspect/inspect_task.py",
+        "--model",
+        "anthropic/claude-opus-5-5",
+        "-T",
+        "seconds=1200",
+        "-T",
+        "max_retries=0",
+        "--epochs",
+        "4",
+        "--max-samples",
+        "4",
+        "--no-fail-on-error",
+        "--log-model-api",
+        "--log-dir",
+        "logs/confirmation-7-20261002T203542Z/batch-2",
+        "--display",
+        "plain"
+      ],
+      "status": "process_finished",
+      "started_at": "2026-10-02T20:50:08.601984+00:00",
+      "pid": 75246,
+      "returncode": 0,
+      "completed_at": "2026-10-02T21:10:16.471902+00:00"
+    }
+  ],
+  "git_head": "819f432022a0d9490af31d0011f2ad92f425a177",
+  "files": [
+    {
+      "path": "task.py",
+      "sha256": "f055666ad99a6341e19ccfc437f9b5c147b2868c6d2f5b789e9827e0c177d818",
+      "bytes": 2183
+    },
+    {
+      "path": "variants.json",
+      "sha256": "c8557a38810ca338612e8ab994bd270570c140123d7a412fd3c431c814427895",
+      "bytes": 481
+    },
+    {
+      "path": "env.json",
+      "sha256": "34384fd58b3415d4f1c875745576930c75006ff89b5fe95372ed17ef9ebdcb2a",
+      "bytes": 146
+    },
+    {
+      "path": ".dockerignore",
+      "sha256": "94d5a070a094d2332ff2be81bb160c94e914e504aa624aa6e249f4d87f9c7ae7",
+      "bytes": 250
+    },
+    {
+      "path": "adapters/docker/Dockerfile",
+      "sha256": "52ea7777b02e22f2994052a919197871e79833491062f9ae09e2155a9a02f7d1",
+      "bytes": 3006
+    },
+    {
+      "path": "adapters/docker/adapter.json",
+      "sha256": "e534dbbe8d8b7de89cdedde17da7cd71fd093a0856e1dc9c4700b953564ce269",
+      "bytes": 433
+    },
+    {
+      "path": "adapters/inspect/inspect_task.py",
+      "sha256": "5dafa4850d4abd9d449e6ab52ae18f4fa0a80128632467cfa5d3cd13ae4b483d",
+      "bytes": 18843
+    },
+    {
+      "path": "adapters/inspect/compose.yaml",
+      "sha256": "831d477b376c000f4d1cefb603b8ab149395adb149d2c27babb2c0d1aca2304e",
+      "bytes": 1550
+    },
+    {
+      "path": "adapters/inspect/passive_trace.py",
+      "sha256": "8463dbba1adbf4136c90b86d41cc85aec7f66bab5416511a1d3b3700af129f02",
+      "bytes": 16322
+    },
+    {
+      "path": "adapters/inspect/harness_agent.py",
+      "sha256": "12ae67caf107359dacdf144065038e98716ce721aa516d651215a1ba3b621f49",
+      "bytes": 21498
+    },
+    {
+      "path": "agent_data/read_csv.py",
+      "sha256": "a7aaab9025a6e22c1f9aa75d2114e0cacac84773f73082bee8a3aea71f341b8d",
+      "bytes": 1015
+    },
+    {
+      "path": "agent_data/README.md",
+      "sha256": "569dbd90ea7c06ab02e642161e10d318afa72e6f3aae928e1d1916ae60a1e4e8",
+      "bytes": 883
+    },
+    {
+      "path": "agent_data/write_json.py",
+      "sha256": "5c88cce39ee3eec0ba75171454f792a12f9619e5ae3c47f791b24870653693d0",
+      "bytes": 4419
+    },
+    {
+      "path": "agent_data/progress.py",
+      "sha256": "296eb1893317a15ac2dbe77dd0d171dc163fc37ceea39f35a2d599369b305c08",
+      "bytes": 1489
+    },
+    {
+      "path": "grader/grader.py",
+      "sha256": "b7b73b9a6dd43bf1ab30665929ec9cbff4c28bc11db63bdc6c935fa7f8f3a057",
+      "bytes": 6801
+    },
+    {
+      "path": "grader/provenance.py",
+      "sha256": "157ff52bcfa222eb8a0f7550e038178078d402b8b5191abb34ea082b931bab43",
+      "bytes": 9238
+    },
+    {
+      "path": "grader/evidence.py",
+      "sha256": "d6a92c93ab82c4b6a0b31caa6d2e27c49bf0a0b531f99a11484718ad7d3e6e52",
+      "bytes": 2286
+    },
+    {
+      "path": "grader/submission_contract.py",
+      "sha256": "abe9a04a0c1c342be7eae87eaf19e53b24dd989a7b6e130ec97770af425f23cc",
+      "bytes": 1450
+    },
+    {
+      "path": "grader/grader_data/crm_data.py",
+      "sha256": "04a341593b9a9d2a3bcdcd60f9d0b89615a799935e0c5922eec140dfce73184a",
+      "bytes": 4698
+    },
+    {
+      "path": "grader/grader_data/reference_solution/solve.py",
+      "sha256": "363c2aaa42bff2de6d750659d21c87af546742ce6e615537f564c990616d7f0d",
+      "bytes": 3507
+    }
+  ],
+  "runtime_versions": {
+    "python": "3.10.12 (main, Jun 22 2024, 00:29:18) [Clang 15.0.0 (clang-1500.3.9.4)]",
+    "inspect_ai": "0.3.273",
+    "anthropic": "1.11.0"
+  },
+  "preflight": {
+    "docker_cpus": 14,
+    "docker_memory_bytes": 16748380160,
+    "containers_running": 0,
+    "active_inspect_jobs": 0,
+    "available_disk_gib": 538
+  },
+  "snapshot_scope": "Experiment source only; root submission docs are being independently updated to remove retired old-setup evidence.",
+  "runner_pid": 70798,
+  "launched_at": "2026-10-02T20:36:47.195299+00:00",
+  "completed_at": "2026-10-02T21:10:16.472657+00:00",
+  "analysis_completed_at": "2026-10-02T21:15:19.251542+00:00",
+  "samples_completed": 7,
+  "report": "../../README.md"
+}
