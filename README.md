@@ -37,9 +37,10 @@ read-only verification scripts from scripts that generated the submitted records
 - [Task prompt](task.py) and [workspace instructions](agent_data/README.md): what the model receives.
 - [Rubric](RUBRIC.md): the supplied evaluation criteria.
 
-Rollouts use Claude Opus 5.5 with `xhigh` reasoning, full native history, no system
-message, and no retries. The results report shows which rollouts followed the requested
-method and which ignored it and used a script.
+The ten retained rollouts used direct Anthropic with Claude Opus 5.5, `xhigh`
+reasoning, full native history, no system message, and no retries. OpenRouter is
+also supported for reproduction. The results report shows which rollouts followed
+the requested method and which ignored it and used a script.
 
 ## Layout
 
@@ -94,7 +95,7 @@ These checks need no API key.
 # Print the agent-visible task.
 .venv/bin/python task.py crm-49819
 
-# Recorded result: 156 passed, 12 skipped.
+# Current offline checks: 184 passed, 12 skipped.
 .venv/bin/python -B -m pytest tests -q -p no:cacheprovider
 
 # Docker cases: 12 passed, no provider calls.
@@ -120,7 +121,7 @@ resolve_attachments=True)`. `sample.messages` contains the mirrored conversation
 `sample.events` contains model calls; `sample.store` contains host observations.
 The JSON exports contain native message arrays and API request/response objects.
 
-## Optional: run a paid rollout
+## Optional: run a paid rollout through Anthropic
 
 Requires `ANTHROPIC_API_KEY` in the environment or an untracked `.env`, and access
 to `claude-opus-5-5`. This command incurs Anthropic API usage.
@@ -141,3 +142,46 @@ summarized thinking, `max_tokens=16384`, full native history without compaction,
 no system message, and one tool call per turn. The unannounced rollout cap is
 1,200 seconds, with a 1,500-second Inspect backstop. Nonpersistent shell calls
 have a 30-second cap; saved partial work is graded at the deadline.
+
+## Optional: run a paid rollout through OpenRouter
+
+Install [requirements-openrouter.txt](requirements-openrouter.txt) and set
+`OPENROUTER_API_KEY` in your environment or an untracked `.env`. The model is
+`anthropic/claude-opus-5.5` on OpenRouter; direct Anthropic uses `claude-opus-5-5`
+and `ANTHROPIC_API_KEY`. This command incurs OpenRouter usage.
+
+```bash
+.venv/bin/python -m pip install -r requirements-openrouter.txt
+
+.venv/bin/inspect eval adapters/inspect/inspect_task.py \
+  --model openrouter/anthropic/claude-opus-5.5 \
+  -T backend=openrouter -T openrouter_provider=Anthropic \
+  -T effort=xhigh -T seconds=1200 -T max_retries=0 \
+  --epochs 1 --max-samples 1 --no-fail-on-error \
+  --log-model-api --log-dir logs/openrouter-reproduction --display plain
+```
+
+The [adapter](adapters/inspect/openrouter_client.py) uses OpenRouter's
+[native Anthropic Messages API](https://openrouter.ai/docs/api/api-reference/anthropic-messages/create-a-message).
+It requests `xhigh`, adaptive thinking with `display=summarized`, the same tools,
+caching, full native history, and no system message. Visible `content[].thinking`
+is a provider-returned summary; signatures and redacted thinking are opaque.
+Every content block and its unknown fields are replayed unchanged. Inspect shows
+visible summaries and marks redactions separately. See OpenRouter's
+[reasoning documentation](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
+
+Routing is restricted to `Anthropic`, requires parameter support, and disables
+provider fallbacks and retries. Change `-T openrouter_provider=` or `-T effort=`
+only to select a different reproduction configuration. The
+[public catalog](https://openrouter.ai/api/v1/models) confirmed the default model's
+`xhigh` support on 2026-10-02. The workload, grader, shell/process limits, and
+unannounced deadline are shared with the direct backend.
+
+`--log-model-api` retains native request/response JSON. `sample.store["provider_calls"]`
+also retains HTTP status, request IDs, available response headers, full response/error
+text, transport errors, request digests, and returned provider/routing metadata;
+credentials are excluded or redacted. Offline mocks and Inspect integration verified
+thinking/history replay, tools, errors, and deadlines with real network transport
+blocked. No real OpenRouter generation or paid rollout was tested; upstream parity
+with the ten historical Anthropic rollouts remains unverified. Retained `results/`
+evidence and source snapshots are unchanged.

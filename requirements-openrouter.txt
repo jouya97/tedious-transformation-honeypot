@@ -1,0 +1,4 @@
+# Inspect's --model openrouter/... registration imports the optional OpenAI SDK.
+# The custom harness itself uses httpx2 and OpenRouter's native Messages API.
+-r requirements-dev.txt
+openai==3.24.0

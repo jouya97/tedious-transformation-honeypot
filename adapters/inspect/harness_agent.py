@@ -178,8 +178,25 @@ class Sandbox(Protocol):
                    timeout_retry: bool = True) -> Any: ...
 
 
-# (payload, request timeout in seconds) -> (response JSON, request id)
-Client = Callable[[dict, float], Awaitable[tuple[dict, str | None]]]
+@dataclass
+class ProviderReply:
+    """Raw native response plus transport evidence (never request credentials)."""
+
+    response: dict
+    request_id: str | None
+    trace: dict
+
+
+class ProviderCallError(RuntimeError):
+    """A failed provider call whose complete available evidence must be logged."""
+
+    def __init__(self, message: str, trace: dict, response: dict | None = None):
+        super().__init__(message)
+        self.trace, self.response = trace, response
+
+
+# Test doubles and the historical Anthropic client retain their two-item result.
+Client = Callable[[dict, float], Awaitable[tuple[dict, str | None] | ProviderReply]]
 
 
 def anthropic_client(max_retries: int = 2, http_client: Any = None) -> Client:
@@ -312,6 +329,8 @@ class Episode:
     """Host-side record of one rollout. `shell_commands` is what the grader gets."""
 
     model: str
+    backend: str = "anthropic"
+    effort: str = REASONING_EFFORT
     messages: list[dict] = field(default_factory=list)
     shell_commands: list[str] = field(default_factory=list)
     steps: list[dict] = field(default_factory=list)
@@ -334,17 +353,27 @@ class Hooks:
                 progress: dict | None) -> None: ...
 
 
-def build_payload(model: str, messages: list[dict]) -> dict:
-    return {
+def build_payload(model: str, messages: list[dict], backend: str = "anthropic",
+                  effort: str = REASONING_EFFORT, provider: str = "Anthropic") -> dict:
+    if backend not in ("anthropic", "openrouter"):
+        raise ValueError(f"unknown backend: {backend}")
+    if backend == "anthropic" and effort != REASONING_EFFORT:
+        raise ValueError("the historical Anthropic backend requires xhigh effort")
+    payload = {
         "model": model,
         "max_tokens": MAX_TOKENS,
-        "output_config": {"effort": REASONING_EFFORT},
+        "output_config": {"effort": effort},
         "thinking": copy.deepcopy(THINKING),
         "cache_control": copy.deepcopy(CACHE_CONTROL),
         "tools": copy.deepcopy(TOOLS),
         "tool_choice": copy.deepcopy(TOOL_CHOICE),
         "messages": copy.deepcopy(messages),
     }
+    if backend == "openrouter":
+        # Native Messages API: no conversion of signed thinking or tool blocks.
+        payload["provider"] = {"only": [provider], "allow_fallbacks": False,
+                               "require_parameters": True}
+    return payload
 
 
 async def step(shell: Shell, episode: Episode, action: dict, remaining: float,
@@ -388,11 +417,13 @@ async def step(shell: Shell, episode: Episode, action: dict, remaining: float,
 
 
 async def run_episode(prompt: str, sandbox: Sandbox, client: Client, model: str,
-                      seconds: float, hooks: Hooks | None = None) -> Episode:
+                      seconds: float, hooks: Hooks | None = None, *,
+                      backend: str = "anthropic", effort: str = REASONING_EFFORT,
+                      provider: str = "Anthropic") -> Episode:
     """One model call, one executed action, until terminal or deadline."""
     hooks = hooks or Hooks()
     shell = Shell(sandbox)
-    episode = Episode(model=model)
+    episode = Episode(model=model, backend=backend, effort=effort)
     target_records = await shell.count_input()
     start = time.monotonic()
     deadline = start + seconds
@@ -409,31 +440,43 @@ async def run_episode(prompt: str, sandbox: Sandbox, client: Client, model: str,
             if remaining <= 0:
                 episode.stop_reason = "deadline"
                 break
-            payload = build_payload(model, episode.messages)
+            payload = build_payload(model, episode.messages, backend, effort, provider)
             timeout = request_timeout(remaining)
             trace: dict = {"index": len(episode.calls) + 1, "timeout_seconds": timeout}
             started = time.monotonic()
             response = None
             with anyio.move_on_after(remaining) as scope:
                 try:
-                    response, trace["request_id"] = await client(payload, timeout)
+                    result = await client(payload, timeout)
+                    if isinstance(result, ProviderReply):
+                        response, trace["request_id"] = result.response, result.request_id
+                        trace.update(result.trace)
+                    else:
+                        response, trace["request_id"] = result
                 except Exception as exc:  # any provider failure ends the episode
+                    if isinstance(exc, ProviderCallError):
+                        trace.update(exc.trace)
+                        response = exc.response
                     trace["elapsed_seconds"] = time.monotonic() - started
-                    timed_out = "timeout" in type(exc).__name__.lower()
+                    timed_out = "timeout" in type(exc).__name__.lower() or trace.get("timed_out", False)
                     episode.stop_reason = ("deadline" if timed_out and timeout < MAX_REQUEST_TIMEOUT_S
                                            else "agent_error")
                     episode.error = f"provider call failed ({type(exc).__name__}): {exc}"[:2000]
                     episode.calls.append(trace)
-                    hooks.model_call(episode, payload, None, trace, episode.error)
+                    hooks.model_call(episode, payload, response, trace, episode.error)
                     break
             trace["elapsed_seconds"] = time.monotonic() - started
             if scope.cancelled_caught:
+                trace.update(copy.deepcopy(getattr(client, "call_trace", {})))
                 episode.stop_reason = "deadline"
                 episode.calls.append(trace)
                 hooks.model_call(episode, payload, None, trace, "deadline reached during the model call")
                 break
             assert response is not None
             trace.update({key: response.get(key) for key in ("id", "model", "stop_reason", "stop_details", "usage")})
+            if backend == "openrouter":
+                trace.update({key: copy.deepcopy(response[key]) for key in
+                              ("provider", "openrouter_metadata", "input_transformations") if key in response})
             episode.calls.append(trace)
             try:
                 action = parse_response(response)

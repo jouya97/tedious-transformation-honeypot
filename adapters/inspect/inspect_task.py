@@ -20,14 +20,19 @@ except by what it actually runs. Commands the host rejected without running
 them (over 300000 characters, NUL bytes) are not in it.
 
 The solver is not basic_agent. It is a custom loop (see harness_agent.py):
-direct Anthropic Messages calls with a fixed payload, native history replay, shell/finish tools, and a 1200 s wall clock
+native Anthropic Messages calls (direct or through OpenRouter), native history replay, shell/finish tools, and a 1200 s wall clock
 that is never announced. Inspect's own Anthropic provider cannot send that
 payload unchanged (it adds betas and a thinking block_binding, omits
 tool_choice when thinking, so parallel tool use cannot be disabled, and
 re-serialises tool results and assistant blocks), so the solver calls the API
 itself and mirrors each turn into state.messages and a ModelEvent for the log.
-The model is `--model anthropic/<id>`; with any other --model (e.g. mockllm for
-offline rollouts) it is `-T model=`, else ANTHROPIC_MODEL, else claude-opus-5-5.
+`--model anthropic/<id>` selects direct Anthropic; `--model openrouter/<id>`
+selects OpenRouter with a provider-qualified Claude ID. For a mockllm placeholder,
+`-T backend=` selects the client and `-T model=` names its model. Model fallback
+is the selected backend's ANTHROPIC_MODEL / OPENROUTER_MODEL environment variable,
+then claude-opus-5-5 / anthropic/claude-opus-5.5 respectively. Conflicting selections
+raise. Direct Anthropic keeps the recorded xhigh policy. OpenRouter requires
+max_retries=0; effort and openrouter_provider are explicit configuration choices.
 
 When the deadline passes the solver stops and the sample is scored as it
 stands: partial output is graded. Task time_limit is only a backstop for a hung
@@ -149,9 +154,13 @@ def load_contract() -> tuple[tuple[str, ...], int, str]:
             str(module.TRANSCRIPT_PATH))
 
 
-def load_client(client: str | Callable[[], harness.Client] | None, max_retries: int) -> harness.Client:
-    """The live Anthropic client, or a test double named `file.py:factory` / `module:factory`."""
+def load_client(client: str | Callable[[], harness.Client] | None, max_retries: int,
+                backend: str = "anthropic") -> harness.Client:
+    """A native provider client, or a test double named `file.py:factory` / `module:factory`."""
     if client is None:
+        if backend == "openrouter":
+            from openrouter_client import openrouter_client
+            return openrouter_client(max_retries=max_retries)
         return harness.anthropic_client(max_retries=max_retries)
     if callable(client):
         return client()
@@ -167,12 +176,28 @@ def load_client(client: str | Callable[[], harness.Client] | None, max_retries: 
     return getattr(module, name)()
 
 
-def resolve_model(active: Any, explicit: str | None) -> str:
-    """`--model anthropic/<id>` names the model; other providers defer to -T model / env."""
-    from_cli = active.name if active is not None and active.api == "anthropic" else None
+def resolve_backend(active: Any, explicit: str | None = None) -> str:
+    backend = explicit or ("openrouter" if active is not None and active.api == "openrouter" else "anthropic")
+    if backend not in ("anthropic", "openrouter"):
+        raise ValueError(f"unknown backend: {backend}")
+    if active is not None and active.api in ("anthropic", "openrouter") and active.api != backend:
+        raise ValueError(f"backend={backend} conflicts with --model {active.api}/{active.name}")
+    return backend
+
+
+def resolve_model(active: Any, explicit: str | None, backend: str = "anthropic") -> str:
+    """Provider-qualified CLI model, then explicit task model, provider env, default."""
+    from_cli = active.name if active is not None and active.api == backend else None
     if explicit and from_cli and explicit != from_cli:
-        raise ValueError(f"-T model={explicit} conflicts with --model anthropic/{from_cli}")
+        raise ValueError(f"-T model={explicit} conflicts with --model {backend}/{from_cli}")
+    if backend == "openrouter":
+        from openrouter_client import DEFAULT_MODEL as openrouter_default
+        return explicit or from_cli or os.environ.get("OPENROUTER_MODEL", "").strip() or openrouter_default
     return explicit or from_cli or os.environ.get("ANTHROPIC_MODEL", "").strip() or DEFAULT_MODEL
+
+
+def model_label(episode: harness.Episode) -> str:
+    return f"{episode.backend}/{episode.model}"
 
 
 TOOL_INFOS = [
@@ -221,6 +246,8 @@ class InspectMirror(harness.Hooks):
         store.set("finish_summary", episode.finish_summary)
         store.set("provider_calls", [dict(call) for call in episode.calls])
         store.set("model", episode.model)
+        store.set("backend", episode.backend)
+        store.set("reasoning_effort", episode.effort)
 
     def started(self, episode: harness.Episode) -> None:
         texts = [ContentText(text=block["text"]) for block in episode.messages[0]["content"]]
@@ -231,13 +258,16 @@ class InspectMirror(harness.Hooks):
         self._store(episode)
 
     def model_call(self, episode, payload, response, trace, error) -> None:
-        model = f"anthropic/{episode.model}"
+        model = model_label(episode)
         prior = list(self.state.messages)
         usage = None
-        if response is not None:
+        if (response is not None and isinstance(response.get("content"), list)
+                and all(isinstance(block, dict) for block in response["content"])):
             message = assistant_message(response.get("content") or [], episode.model)
             self.state.messages.append(message)
             raw = response.get("usage") or {}
+            if not isinstance(raw, dict):
+                raw = {}
             usage = ModelUsage(
                 input_tokens=raw.get("input_tokens") or 0, output_tokens=raw.get("output_tokens") or 0,
                 input_tokens_cache_write=raw.get("cache_creation_input_tokens"),
@@ -251,7 +281,7 @@ class InspectMirror(harness.Hooks):
             output = ModelOutput.from_content(model=model, content="", stop_reason="unknown", error=error)
         transcript()._event(ModelEvent(
             model=model, input=prior, tools=TOOL_INFOS, tool_choice="auto",
-            config=GenerateConfig(max_tokens=harness.MAX_TOKENS, effort=harness.REASONING_EFFORT,
+            config=GenerateConfig(max_tokens=harness.MAX_TOKENS, effort=episode.effort,
                                   parallel_tool_calls=False),
             output=output, error=error,
             call=ModelCall.create(request=payload, response=response, time=trace.get("elapsed_seconds")),
@@ -270,17 +300,21 @@ class InspectMirror(harness.Hooks):
 
 @solver
 def crm_harness(seconds: float = EPISODE_SECONDS, model: str | None = None,
-                client: str | Callable[[], harness.Client] | None = None, max_retries: int = 2):
+                client: str | Callable[[], harness.Client] | None = None, max_retries: int = 2,
+                backend: str | None = None, effort: str = harness.REASONING_EFFORT,
+                openrouter_provider: str = "Anthropic"):
     async def solve(state: TaskState, generate: Generate) -> TaskState:
-        model_id = resolve_model(state.model, model)
+        selected_backend = resolve_backend(state.model, backend)
+        model_id = resolve_model(state.model, model, selected_backend)
         episode = await harness.run_episode(
-            prompt=state.input_text, sandbox=sandbox(), client=load_client(client, max_retries),
+            prompt=state.input_text, sandbox=sandbox(), client=load_client(client, max_retries, selected_backend),
             model=model_id, seconds=float(seconds), hooks=InspectMirror(state),
+            backend=selected_backend, effort=effort, provider=openrouter_provider,
         )
         state.store.set("stop_reason", episode.stop_reason)
         state.store.set("episode_error", episode.error)
         state.store.set("elapsed_seconds", round(episode.elapsed_seconds, 3))
-        state.output = ModelOutput.from_content(model=f"anthropic/{model_id}",
+        state.output = ModelOutput.from_content(model=model_label(episode),
                                                 content=episode.finish_summary or "")
         return state
 
@@ -379,11 +413,13 @@ def render_prompt(variant: str) -> str:
 
 @task
 def honeypot(seconds: float = EPISODE_SECONDS, model: str | None = None,
-             client: str | None = None, max_retries: int = 2) -> Task:
+             client: str | None = None, max_retries: int = 2, backend: str | None = None,
+             effort: str = harness.REASONING_EFFORT, openrouter_provider: str = "Anthropic") -> Task:
     variants = json.loads((ROOT / "variants.json").read_text())["variants"]
     return Task(
         dataset=[Sample(input=render_prompt(v), metadata={"variant": v}, id=v) for v in variants],
-        solver=crm_harness(seconds=seconds, model=model, client=client, max_retries=max_retries),
+        solver=crm_harness(seconds=seconds, model=model, client=client, max_retries=max_retries,
+                          backend=backend, effort=effort, openrouter_provider=openrouter_provider),
         scorer=fresh_container_grader(),
         sandbox=("docker", str(Path(__file__).parent / "compose.yaml")),
         time_limit=int(seconds) + BACKSTOP_SECONDS,
