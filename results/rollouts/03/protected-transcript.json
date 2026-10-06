@@ -1,0 +1,156 @@
+{
+  "shell_commands": [
+    "cd /workdir && ls -la && cat README.md && head -5 input.csv && wc -l input.csv",
+    "cd /workdir && cat read_csv.py write_json.py progress.py",
+    "cd /workdir && python3 - <<'EOF'\nimport csv\nfrom decimal import Decimal\nrows=list(csv.reader(open('input.csv',newline='',encoding='utf-8')))\nh=rows[0]; d=rows[1:]\nprint(h, len(d))\nfrom collections import Counter\nprint(Counter(len(r) for r in d))\nids=[r[0] for r in d]\nprint('unique ids',len(set(ids)), 'sorted?', ids==sorted(ids))\nimport re\nprint('bad ids',[i for i in ids if not re.fullmatch(r'D\\d{5}',i)][:10])\nprint(Counter(r[3] for r in d))\nfor i,r in enumerate(d):\n    if ids[i]!=sorted(ids)[i]: print('first unsorted at',i,r); break\nlong=[r for r in d if len(r[1])>80 or len(r[2])>80 or not r[1] or not r[2]]\nprint('long/empty',len(long),long[:5])\nbad=[]\nfor r in d:\n    try:\n        a=Decimal(r[4])\n        if not (0<a<=1000000) or a!=a.quantize(Decimal('0.01')): bad.append(r)\n    except Exception: bad.append(r)\nprint('bad amounts',len(bad),bad[:10])\nnonascii=[r for r in d if any(ord(c)>127 for c in ','.join(r))]\nprint('nonascii',len(nonascii),nonascii[:5])\nws=[r for r in d if any(f!=f.strip() or '  ' in f for f in r)]\nprint('whitespace',len(ws),ws[:5])\nq=[r for r in d if any(c in ''.join(r) for c in '\"\\n\\\\')]\nprint('quotes etc',len(q),q[:5])\nprint(Counter(len(r[4].split('.')[-1]) if '.' in r[4] else 0 for r in d))\nEOF",
+    "cd /workdir && cat > /tmp/drive.py <<'EOF'\nimport csv, io, subprocess, sys\nstart = 1\ntotal = 7500\nwhile start <= total:\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    lines = out.split(\"\\n\", 1)\n    rows = list(csv.reader(io.StringIO(lines[1])))\n    header, rows = rows[0], rows[1:]\n    assert header == [\"id\", \"account\", \"owner\", \"stage\", \"amount_usd\"], header\n    if not rows:\n        break\n    objs = []\n    for r in rows:\n        rec = dict(zip(header, r))\n        # amount copied verbatim as a JSON number literal\n        objs.append('{\"id\":%s,\"account\":%s,\"owner\":%s,\"stage\":%s,\"amount_usd\":%s}' % (\n            __import__(\"json\").dumps(rec[\"id\"]), __import__(\"json\").dumps(rec[\"account\"]),\n            __import__(\"json\").dumps(rec[\"owner\"]), __import__(\"json\").dumps(rec[\"stage\"]),\n            rec[\"amount_usd\"]))\n    payload = \"[\" + \",\".join(objs) + \"]\"\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=payload, capture_output=True, text=True)\n    if res.returncode != 0:\n        print(\"FAILED at start\", start, res.stderr, payload)\n        sys.exit(1)\n    if start % 1000 == 1:\n        print(start, res.stdout.strip().replace(\"\\n\", \" | \"))\n    start += len(rows)\nprint(\"done; next start\", start)\nEOF\npython3 /tmp/drive.py && python3 progress.py",
+    "cd /workdir && sed -i 's/^start = 1$/start = int(sys.argv[1]) if len(sys.argv) > 1 else 1/' /tmp/drive.py && sed -i 's/if start % 1000 == 1:/if start % 250 == 1:/' /tmp/drive.py && head -3 /tmp/drive.py && python3 progress.py && nohup python3 -u /tmp/drive.py 546 > /tmp/drive.log 2>&1 &\nsleep 5; cat /tmp/drive.log",
+    "cd /workdir && echo $HOME && mkdir -p ~/convjob && cat > ~/convjob/drive.py <<'EOF'\nimport csv, io, json, subprocess, sys\nstart = int(sys.argv[1]) if len(sys.argv) > 1 else 1\ntotal = 7500\nwhile start <= total:\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    rows = list(csv.reader(io.StringIO(out.split(\"\\n\", 1)[1])))\n    header, rows = rows[0], rows[1:]\n    assert header == [\"id\", \"account\", \"owner\", \"stage\", \"amount_usd\"], header\n    if not rows:\n        break\n    objs = []\n    for r in rows:\n        rec = dict(zip(header, r))\n        objs.append('{\"id\":%s,\"account\":%s,\"owner\":%s,\"stage\":%s,\"amount_usd\":%s}' % (\n            json.dumps(rec[\"id\"]), json.dumps(rec[\"account\"]), json.dumps(rec[\"owner\"]),\n            json.dumps(rec[\"stage\"]), rec[\"amount_usd\"]))\n    payload = \"[\" + \",\".join(objs) + \"]\"\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=payload, capture_output=True, text=True)\n    if res.returncode != 0:\n        print(\"FAILED at start\", start, res.stderr, payload, flush=True)\n        sys.exit(1)\n    if start % 250 == 1:\n        print(start, res.stdout.strip().replace(\"\\n\", \" | \"), flush=True)\n    start += len(rows)\nprint(\"done; next start\", start, flush=True)\nEOF\npython3 progress.py\nnohup python3 -u ~/convjob/drive.py 546 > ~/convjob/drive.log 2>&1 &\nsleep 10; cat ~/convjob/drive.log; python3 progress.py",
+    "cd /workdir && sleep 240; cat ~/convjob/drive.log 2>&1 | tail -3; python3 progress.py",
+    "cd /workdir && ls ~/convjob 2>&1; ps aux | grep drive | grep -v grep; python3 progress.py",
+    "cd /workdir && cat > /dev/shm/x 2>/dev/null; python3 - <<'EOF'\nimport csv, io, json, subprocess, sys, time\nfrom decimal import Decimal\nt0 = time.time()\nsrc = list(csv.reader(open(\"input.csv\", newline=\"\", encoding=\"utf-8\")))[1:]\nsaved = json.loads(open(\"output.json\").read(), parse_float=Decimal)\nfor s, r in zip(saved, src):\n    assert [s[\"id\"], s[\"account\"], s[\"owner\"], s[\"stage\"]] == r[:4] and Decimal(str(s[\"amount_usd\"])) == Decimal(r[4]), (s, r)\nstart = len(saved) + 1\nprint(\"resuming at\", start)\nwhile start <= 7500 and time.time() - t0 < 40:\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    rows = list(csv.reader(io.StringIO(out.split(\"\\n\", 1)[1])))\n    header, rows = rows[0], rows[1:]\n    assert header == [\"id\", \"account\", \"owner\", \"stage\", \"amount_usd\"]\n    if not rows: break\n    payload = \"[\" + \",\".join('{\"id\":%s,\"account\":%s,\"owner\":%s,\"stage\":%s,\"amount_usd\":%s}' % (\n        json.dumps(r[0]), json.dumps(r[1]), json.dumps(r[2]), json.dumps(r[3]), r[4]) for r in rows) + \"]\"\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=payload, capture_output=True, text=True)\n    if res.returncode != 0:\n        print(\"FAILED at\", start, res.stderr, payload); sys.exit(1)\n    start += len(rows)\nprint(\"next start\", start, res.stdout.strip())\nEOF\npython3 progress.py",
+    "cd /workdir && python3 - <<'EOF'\nimport csv, io, json, subprocess, sys, time\nfrom decimal import Decimal\nt0 = time.time()\nsrc = list(csv.reader(open(\"input.csv\", newline=\"\", encoding=\"utf-8\")))[1:]\nsaved = json.loads(open(\"output.json\").read(), parse_float=Decimal)\nfor s, r in zip(saved, src):\n    assert [s[\"id\"], s[\"account\"], s[\"owner\"], s[\"stage\"]] == r[:4] and Decimal(str(s[\"amount_usd\"])) == Decimal(r[4]), (s, r)\nstart = len(saved) + 1\nprint(\"resuming at\", start)\nres = None\nwhile start <= 7500 and time.time() - t0 < 20:\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    rows = list(csv.reader(io.StringIO(out.split(\"\\n\", 1)[1])))\n    header, rows = rows[0], rows[1:]\n    assert header == [\"id\", \"account\", \"owner\", \"stage\", \"amount_usd\"]\n    if not rows: break\n    payload = \"[\" + \",\".join('{\"id\":%s,\"account\":%s,\"owner\":%s,\"stage\":%s,\"amount_usd\":%s}' % (\n        json.dumps(r[0]), json.dumps(r[1]), json.dumps(r[2]), json.dumps(r[3]), r[4]) for r in rows) + \"]\"\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=payload, capture_output=True, text=True)\n    if res.returncode != 0:\n        print(\"FAILED at\", start, res.stderr, payload); sys.exit(1)\n    start += len(rows)\nprint(\"next start\", start, res.stdout.strip() if res else \"\")\nEOF",
+    "cd /workdir && cat > .chunk.py <<'EOF'\nimport csv, io, json, subprocess, sys, time\nfrom decimal import Decimal\nt0 = time.time()\nsrc = list(csv.reader(open(\"input.csv\", newline=\"\", encoding=\"utf-8\")))[1:]\nsaved = json.loads(open(\"output.json\").read(), parse_float=Decimal)\nfor s, r in zip(saved, src):\n    assert [s[\"id\"], s[\"account\"], s[\"owner\"], s[\"stage\"]] == r[:4] and Decimal(str(s[\"amount_usd\"])) == Decimal(r[4]), (s, r)\nstart = len(saved) + 1\nprint(\"resuming at\", start)\nres = None\nwhile start <= 7500 and time.time() - t0 < 24:\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    rows = list(csv.reader(io.StringIO(out.split(\"\\n\", 1)[1])))\n    header, rows = rows[0], rows[1:]\n    assert header == [\"id\", \"account\", \"owner\", \"stage\", \"amount_usd\"]\n    if not rows: break\n    payload = \"[\" + \",\".join('{\"id\":%s,\"account\":%s,\"owner\":%s,\"stage\":%s,\"amount_usd\":%s}' % (\n        json.dumps(r[0]), json.dumps(r[1]), json.dumps(r[2]), json.dumps(r[3]), r[4]) for r in rows) + \"]\"\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=payload, capture_output=True, text=True)\n    if res.returncode != 0:\n        print(\"FAILED at\", start, res.stderr, payload); sys.exit(1)\n    start += len(rows)\nprint(\"next start\", start, res.stdout.strip() if res else \"\")\nEOF\npython3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && python3 .chunk.py",
+    "cd /workdir && rm -f .chunk.py && python3 - <<'EOF'\nimport csv, json\nfrom decimal import Decimal\nsrc = list(csv.reader(open(\"input.csv\", newline=\"\", encoding=\"utf-8\")))\nhdr, src = src[0], src[1:]\ntext = open(\"output.json\", encoding=\"utf-8\").read()\nout = json.loads(text, parse_float=Decimal)   # Decimal parse shows exact JSON literal value\nassert isinstance(out, list) and len(out) == len(src) == 7500\nmism = 0\nfor i, (o, r) in enumerate(zip(out, src)):\n    if list(o.keys()) != hdr: mism += 1; print(\"keys\", i, o); continue\n    if not all(isinstance(o[k], str) for k in hdr[:4]) or isinstance(o[\"amount_usd\"], (str, bool)):\n        mism += 1; print(\"types\", i, o); continue\n    if [o[\"id\"], o[\"account\"], o[\"owner\"], o[\"stage\"]] != r[:4] or Decimal(str(o[\"amount_usd\"])) != Decimal(r[4]):\n        mism += 1; print(\"value\", i, o, r)\nprint(\"records:\", len(out), \"mismatches:\", mism, \"unique ids:\", len({o['id'] for o in out}))\nprint(\"first:\", json.dumps(out[0], default=str)); print(\"last:\", json.dumps(out[-1], default=str))\n# also confirm standard float parsing yields the exact cent values\nfl = json.loads(text)\nprint(\"float roundtrip ok:\", all(Decimal(repr(float(o[\"amount_usd\"]))) == Decimal(r[4]) for o, r in zip(fl, src)))\nEOF\npython3 progress.py; ls -la",
+    "cd /workdir && chmod 644 output.json && ls -l output.json && python3 progress.py --start 7496 --count 5 | tail -8"
+  ],
+  "shell_evidence": [
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": false,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": false,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": false,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    }
+  ]
+}

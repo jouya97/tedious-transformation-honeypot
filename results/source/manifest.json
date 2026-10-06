@@ -1,0 +1,98 @@
+{
+  ".dockerignore": {
+    "sha256": "fca3e21a985303b5ac0d4492a99d1da0f31fad8781ad7928135c1245e2d27dd1",
+    "bytes": 276
+  },
+  "adapters/docker/Dockerfile": {
+    "sha256": "e3b06c3c6cf29012757d9e51564590ba086cec96cb369fff8b65025fe0aa89bf",
+    "bytes": 3163
+  },
+  "adapters/docker/adapter.json": {
+    "sha256": "7ad97cadc236abeb697a703a6a5cfd287567180c0a330d5c38da4c403e7c7209",
+    "bytes": 433
+  },
+  "adapters/docker/python3-launcher": {
+    "sha256": "f5d7835baa6b764603e70c8718f026aa707b8e3391e3ecc4e3a67ce192f03529",
+    "bytes": 802
+  },
+  "adapters/inspect/compose.yaml": {
+    "sha256": "9ce36ddbdb739182dde25dc67bff0888c4388782bfa399082ababb0575851071",
+    "bytes": 1521
+  },
+  "adapters/inspect/harness_agent.py": {
+    "sha256": "ca4e02a872618300889b4ea686caa1c32badf5ce8af2dd5e406fb80f49767d38",
+    "bytes": 24402
+  },
+  "adapters/inspect/helper_trace.py": {
+    "sha256": "89a2f867c551611d79b600b2b6de621869f56ca46c990e63f6b6f1044f8f968b",
+    "bytes": 7784
+  },
+  "adapters/inspect/inspect_task.py": {
+    "sha256": "250c8d1ef1070de86b645e19a9c5d86f548c216c581a4d46b7dd6e303bbff703",
+    "bytes": 18443
+  },
+  "agent_data/README.md": {
+    "sha256": "1f2101ab816e69eb1522b881d65e77c824aa57fa3dbb0fd44eccebb4c3014571",
+    "bytes": 880
+  },
+  "agent_data/progress.py": {
+    "sha256": "78ba571abbecb73163a57e17fb5c788936a469753c67734339ab6da7ffd3fe91",
+    "bytes": 1486
+  },
+  "agent_data/read_csv.py": {
+    "sha256": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+    "bytes": 1012
+  },
+  "agent_data/write_json.py": {
+    "sha256": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a",
+    "bytes": 4206
+  },
+  "env.json": {
+    "sha256": "34384fd58b3415d4f1c875745576930c75006ff89b5fe95372ed17ef9ebdcb2a",
+    "bytes": 146
+  },
+  "grader/grader.py": {
+    "sha256": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+    "bytes": 8968
+  },
+  "grader/grader_data/crm_data.py": {
+    "sha256": "e0c43e80ab3498fde4f6486d7ea717d1fc81af668e502d03f824db885567e0d3",
+    "bytes": 4396
+  },
+  "grader/grader_data/reference_solution/solve.py": {
+    "sha256": "d8dd26ad44cc3d1466537d867230e97ceb96ece7698965df54b7104e245ed3ad",
+    "bytes": 2759
+  },
+  "grader/provenance.py": {
+    "sha256": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+    "bytes": 19291
+  },
+  "grader/submission_contract.py": {
+    "sha256": "49f9360390d8f1a3fbad89d83e287e3da26ccc3388c9ce7bb8450ae855e4d43b",
+    "bytes": 2055
+  },
+  "input.csv": {
+    "sha256": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+    "bytes": 451900
+  },
+  "launch_task.py": {
+    "sha256": "736b360453a4dddcbdd3fb11e2cc393d07c80bb0356741e3ecea7a4f9bbac93d",
+    "bytes": 4188
+  },
+  "prompt.txt": {
+    "sha256": "6b931ccec5a2b07ec1b12b66b7a2eb193376b69de256a7084fd3cf3c7b01dd85",
+    "bytes": 1227
+  },
+  "runtime-container-images.json": {
+    "sha256": "c41210c9e69ae114ba5135220f469c13a926504b3a9ed329be4e408f8cedaf17",
+    "bytes": 9453
+  },
+  "task.py": {
+    "sha256": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+    "bytes": 2004
+  },
+  "variants.json": {
+    "sha256": "d5bb5cd5c5a02097d2cbb7efb1eee9ed8a933882595eb100b27ac0ddff9da157",
+    "bytes": 549
+  }
+}
