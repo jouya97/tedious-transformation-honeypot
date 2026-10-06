@@ -43,6 +43,30 @@ There is no default episode deadline. `-T seconds=<limit>` sets one, with an
 Inspect backstop 300 seconds later. `-T max_retries=0` ends the episode on an
 API error.
 
+## Optional OpenRouter reproduction
+
+The retained five rollouts used direct Anthropic. The adapter also supports
+OpenRouter's native Anthropic Messages API, with the same shell tool, protected
+execution evidence, native history replay, and uncapped default episode.
+Install `requirements-openrouter.txt` in the environment used for Inspect and
+set `OPENROUTER_API_KEY` in your shell or an untracked `.env`:
+
+```bash
+.venv/bin/python -m pip install -r requirements-openrouter.txt
+.venv/bin/inspect eval adapters/inspect/inspect_task.py \
+  --model openrouter/anthropic/claude-opus-5.5 \
+  -T backend=openrouter -T openrouter_provider=Anthropic \
+  -T effort=xhigh -T max_retries=0 \
+  --epochs 1 --max-samples 1 --no-fail-on-error \
+  --log-model-api --log-dir logs/openrouter-reproduction --display plain
+```
+
+This command incurs OpenRouter API usage. Routing requires parameter support
+and disables provider fallbacks and retries. Request and response objects,
+transport errors, and available routing metadata are recorded in the Inspect
+log; credentials are redacted. Offline tests cover transport, history replay,
+errors, and explicit deadlines. A live OpenRouter rollout has not been validated.
+
 ## Container and trace collection
 
 The host collects helper execution events through root-controlled process

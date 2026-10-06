@@ -523,4 +523,3 @@ Because of the shell's time limit, I ran this in chunks, and saved work carried 
 
 I deleted my temporary script and log. The `__pycache__` folder in the workspace was created automatically when `progress.py` loaded `write_json.py`.
 ```
-
