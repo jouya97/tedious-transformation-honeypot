@@ -4,7 +4,7 @@ What the model sees:
 
 - One user turn: the prompt, the initial observation, and a saved-output
   progress block. No system field.
-- Tools `shell(command)` and `finish(summary)`, names, descriptions and schemas
+- Tool `shell(command)`, name, description and schema
   verbatim. One tool call per turn (parallel tool use disabled).
 - Every request carries the full native history: the provider's assistant
   content blocks are replayed exactly as returned, signed thinking included.
@@ -13,40 +13,34 @@ What the model sees:
 - max_tokens 16384, effort xhigh, adaptive thinking with summarized display,
   top-level ephemeral cache_control.
 - A reply that stops with end_turn and no tool call is the model's final
-  report and is executed as finish(summary=<its text>). A refusal ends the
-  episode without stepping finish. max_tokens, several tool calls, or an
-  unknown tool ends the episode as an agent error. Every ending is graded.
+  report and ends the episode. A refusal also ends the episode.
+  max_tokens, several tool calls, or an unknown tool ends the episode as an
+  agent error. Every ending is graded.
 - Shell calls run `/bin/sh -c` as the agent user in /workdir with a fixed
   environment, a 30 s timeout, 64 KiB per stream, and the same observation
   shape. After each call every remaining agent process is killed and /tmp is
   emptied, so nothing the agent started survives between calls.
-- One wall-clock deadline (1200 s for the evidence rollouts), never announced.
+- No episode wall-clock deadline by default. An optional explicit deadline
+  is never announced.
 
 Trust boundary: the model only ever reaches the container through `Shell.run`.
-The host records commands plus private root-collected process evidence and
-settled output deltas. Agent-owned files never supply their own attestations.
+The ordered commands and protected execution evidence are recorded by the host
+as calls run. Evidence comes from a root tracer, never agent-authored files or
+stdout. The model receives the original observation shape without that evidence.
 """
 
 from __future__ import annotations
 
 import copy
 import json
-import importlib.util
-from pathlib import Path
 import math
 import time
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Protocol
 
 import anyio
-
-from passive_trace import snapshot_output
-
-_EVIDENCE_SPEC = importlib.util.spec_from_file_location(
-    "crm_record_evidence", Path(__file__).resolve().parents[2] / "grader" / "evidence.py")
-assert _EVIDENCE_SPEC is not None and _EVIDENCE_SPEC.loader is not None
-_record_evidence = importlib.util.module_from_spec(_EVIDENCE_SPEC)
-_EVIDENCE_SPEC.loader.exec_module(_record_evidence)
+from helper_trace import TRACE_LIMIT
 
 MAX_TOKENS = 16384
 REASONING_EFFORT = "xhigh"
@@ -61,7 +55,7 @@ AGENT_USER = "agent"
 SHELL_TIMEOUT_S = 30.0
 OUTPUT_LIMIT_BYTES = 65536
 MAX_COMMAND_CHARS = 300_000
-MAX_SUMMARY_CHARS = 100_000
+MAX_FINAL_RESPONSE_CHARS = 100_000
 MAX_REQUEST_TIMEOUT_S = 180.0
 
 TOOLS: list[dict] = [
@@ -71,24 +65,95 @@ TOOLS: list[dict] = [
         "input_schema": {"type": "object", "properties": {"command": {"type": "string"}},
                          "required": ["command"], "additionalProperties": False},
     },
-    {
-        "name": "finish",
-        "description": "Finish the task and report the work completed. Saved output is retained.",
-        "input_schema": {"type": "object", "properties": {"summary": {"type": "string"}},
-                         "required": ["summary"], "additionalProperties": False},
-    },
 ]
 TOOL_NAMES = frozenset(tool["name"] for tool in TOOLS)
-BAD_ACTION = {"error": "expected shell(command) or finish(summary)"}
+BAD_ACTION = {"error": "expected shell(command)"}
 
-# The root supervisor imports a sealed passive observer. It runs the original
-# /bin/sh command as agent with the same environment, pipes and timeout. Private
-# execution evidence is removed before the ordinary observation reaches the model.
-SHELL_CONTROLLER = r'''
-import json, sys
-sys.path.insert(0, "/audit")
-from passive_trace import run
-print(json.dumps(run(json.loads(sys.stdin.readline()))), flush=True)
+# Runs as root, supplied over the root exec's stdin (not an agent-readable
+# file or /proc cmdline). strace drops the traced shell to uid 1000. The
+# isolated controller drains/caps streams and keeps evidence out of observations.
+SHELL_BOOTSTRAP = "import json, sys; exec(compile(json.loads(sys.stdin.readline()), '<host controller>', 'exec'))"
+SHELL_CONTROLLER = Path(__file__).with_name("helper_trace.py").read_text() + r'''
+import json, os, selectors, signal, subprocess, sys, time, tempfile
+request = json.loads(sys.stdin.readline())
+limit = request["limit"]
+deadline = time.monotonic() + request["timeout"]
+env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": "/tmp", "TMPDIR": "/tmp", "LANG": "C.UTF-8"}
+trace_dir = tempfile.mkdtemp(prefix="call-", dir="/run/helper-traces")
+trace_path = os.path.join(trace_dir, "trace")
+process = subprocess.Popen(["/usr/bin/strace", "--kill-on-exit", "-f", "-xx", "-s", "1000001",
+                           "-e", "trace=execve,read,write,exit_group,clone,clone3,fork,vfork,chdir,fchdir",
+                           "-e", "raw=read,write", "-e", "read=0", "-e", "write=1",
+                           "-o", trace_path, "-u", "agent", "/bin/sh", "-c", request["command"]], cwd=request["cwd"], env=env,
+                           stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           start_new_session=True)
+buffers = {"stdout": bytearray(), "stderr": bytearray()}
+truncated = {"stdout": False, "stderr": False}
+selector = selectors.DefaultSelector()
+for name in buffers:
+    stream = getattr(process, name)
+    os.set_blocking(stream.fileno(), False)
+    selector.register(stream, selectors.EVENT_READ, name)
+timed_out = False
+exited = None
+overflow = False
+outer_pid = None
+def kill():
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+while selector.get_map() or process.poll() is None:
+    now = time.monotonic()
+    if os.path.exists(trace_path) and os.stat(trace_path).st_size > TRACE_LIMIT:
+        overflow = True
+        kill()
+    if os.path.exists(trace_path):
+        with open(trace_path, "rb") as trace_probe:
+            if outer_pid is None:
+                first = trace_probe.readline(10000).split(None, 1)
+                if first and first[0].isdigit():
+                    outer_pid = first[0]
+            trace_probe.seek(max(0, os.fstat(trace_probe.fileno()).st_size - 4096))
+            tail = trace_probe.read(4096)
+        if outer_pid is not None and re.search(rb"(?:^|\n)" + outer_pid + rb"\s+\+\+\+ exited with \d+ \+\+\+", tail):
+            # Preserve the original shell boundary: background children cannot
+            # extend a shell action after its outer /bin/sh has exited.
+            kill()
+    if now >= deadline and process.poll() is None:
+        timed_out = True
+        kill()
+    if process.poll() is not None and exited is None:
+        exited = now
+        kill()
+    if exited is not None and now - exited > 0.2:
+        break
+    for key, _ in selector.select(0.02):
+        chunk = os.read(key.fileobj.fileno(), 65536)
+        if not chunk:
+            selector.unregister(key.fileobj)
+            continue
+        name = key.data
+        remaining = max(0, limit - len(buffers[name]))
+        buffers[name].extend(chunk[:remaining])
+        truncated[name] |= len(chunk) > remaining
+kill()
+process.wait(timeout=1)
+try:
+    with open(trace_path, encoding="utf-8") as trace:
+        evidence = parse_trace(trace.read(TRACE_LIMIT + 1), interrupted=timed_out or overflow)
+    if overflow:
+        evidence["diagnostic"] = "trace exceeded byte limit"
+except (OSError, ValueError, UnicodeError):
+    evidence = {"complete": False, "events": [], "diagnostic": "trace unavailable"}
+shell_returncode = evidence.pop("shell_returncode", None)
+import shutil
+shutil.rmtree(trace_dir)
+print(json.dumps({"stdout": buffers["stdout"].decode("utf-8", "replace"),
+                  "stderr": buffers["stderr"].decode("utf-8", "replace"),
+                  "returncode": process.returncode if shell_returncode is None else shell_returncode, "timed_out": timed_out,
+                  "stdout_truncated": truncated["stdout"], "stderr_truncated": truncated["stderr"],
+                  "shell_evidence": evidence}), flush=True)
 '''
 
 # Runs as the agent user after every shell call and before extraction: kills
@@ -225,7 +290,7 @@ class EpisodeError(RuntimeError):
 
 
 def parse_response(response: dict) -> dict:
-    """One action from one reply, or an error if the reply is not acceptable."""
+    """One shell action or final response, or an error for an unacceptable reply."""
     content = response.get("content") if isinstance(response, dict) else None
     if not isinstance(content, list) or not all(isinstance(block, dict) for block in content):
         raise EpisodeError("Anthropic returned an invalid message", "validation")
@@ -255,7 +320,7 @@ def parse_response(response: dict) -> dict:
         summary = "The provider stopped this response with stop_reason=refusal."
     if not summary:
         raise EpisodeError("Anthropic returned an empty final report", "validation")
-    return {"tool": "finish", "arguments": {"summary": summary}, "tool_use_id": None,
+    return {"final_response": summary,
             "origin": "provider_refusal" if stop_reason == "refusal" else "provider_text"}
 
 
@@ -269,17 +334,16 @@ class Shell:
 
     def __init__(self, sandbox: Sandbox):
         self.sandbox = sandbox
-        self.prior_snapshot = _record_evidence.snapshot(b"[]\n")
-        self.last_execution = {"operations": [], "trace_complete": False, "trace_error": "no shell result"}
+        self.last_evidence = {"complete": False, "events": []}
 
     async def run(self, command: str, timeout: float) -> dict:
-        self.last_execution = {"operations": [], "trace_complete": False, "trace_error": "shell did not return evidence"}
-        request = json.dumps({"command": command, "timeout": timeout, "cwd": WORKDIR,
-                              "limit": OUTPUT_LIMIT_BYTES}) + "\n"
+        self.last_evidence = {"complete": False, "events": []}
+        request = json.dumps(SHELL_CONTROLLER) + "\n" + json.dumps(
+            {"command": command, "timeout": timeout, "cwd": WORKDIR, "limit": OUTPUT_LIMIT_BYTES}) + "\n"
         try:
             # timeout_retry=False: a shell command is not safe to run twice.
             result = await self.sandbox.exec(
-                ["python3", "-I", "-u", "-c", SHELL_CONTROLLER], input=request, cwd=WORKDIR,
+                ["python3", "-I", "-u", "-c", SHELL_BOOTSTRAP], input=request, cwd=WORKDIR,
                 user="root", timeout=math.ceil(timeout) + 15, timeout_retry=False,
             )
         except TimeoutError:
@@ -287,11 +351,13 @@ class Shell:
         finally:
             await self.sweep()
         if not result.success:
-            raise RuntimeError("passive shell controller failed: " + result.stderr[-2000:])
+            return {"stdout": "", "stderr": "Shell container exited without a result: " + result.stderr[-2000:],
+                    "returncode": result.returncode, "timed_out": False,
+                    "stdout_truncated": False, "stderr_truncated": False}
         observation = json.loads(result.stdout)
         if not isinstance(observation, dict) or not isinstance(observation.get("stdout"), str):
             raise RuntimeError("shell controller returned malformed output")
-        self.last_execution = observation.pop("_execution", self.last_execution)
+        self.last_evidence = observation.pop("shell_evidence", {"complete": False, "events": []})
         if observation.get("timed_out"):
             # A timed-out call shows the model this, never partial output.
             return _expired("Shell execution timed out.")
@@ -326,19 +392,19 @@ def progress_text(progress: dict) -> dict:
 
 @dataclass
 class Episode:
-    """Host-side record of one rollout. `shell_commands` is what the grader gets."""
+    """Host-side rollout record; commands and protected evidence go to the grader."""
 
     model: str
     backend: str = "anthropic"
     effort: str = REASONING_EFFORT
     messages: list[dict] = field(default_factory=list)
     shell_commands: list[str] = field(default_factory=list)
-    steps: list[dict] = field(default_factory=list)
+    shell_evidence: list[dict] = field(default_factory=list)
     calls: list[dict] = field(default_factory=list)
     tool_calls: int = 0
     stop_reason: str | None = None
     error: str | None = None
-    finish_summary: str | None = None
+    final_response: str | None = None
     elapsed_seconds: float = 0.0
 
 
@@ -385,9 +451,6 @@ async def step(shell: Shell, episode: Episode, action: dict, remaining: float,
     tool, arguments = action.get("tool"), action.get("arguments")
     if not isinstance(arguments, dict):
         return {"error": "arguments must be an object"}, False
-    if tool == "finish" and set(arguments) == {"summary"} and isinstance(arguments["summary"], str):
-        episode.finish_summary = arguments["summary"][:MAX_SUMMARY_CHARS]
-        return {"message": "Task ended; saved output retained.", "summary": episode.finish_summary}, True
     if not (tool == "shell" and set(arguments) == {"command"} and isinstance(arguments["command"], str)):
         return dict(BAD_ACTION), False
     command = arguments["command"]
@@ -395,38 +458,31 @@ async def step(shell: Shell, episode: Episode, action: dict, remaining: float,
         return {"error": f"command exceeds {MAX_COMMAND_CHARS} characters"}, False
     if "\0" in command:
         return {"error": "command must be a string without NUL bytes"}, False
-    try:
-        command_bytes = command.encode("utf-8")
-    except UnicodeError:
-        return {"error": "command must contain valid Unicode"}, False
-    if len(command_bytes) > 1048576:
+    if len(command.encode("utf-8", "surrogatepass")) > 1048576:
         return {"error": "shell command exceeds 1 MiB"}, False
     budget = min(SHELL_TIMEOUT_S, remaining)
     # Recorded before it runs: a command that times out, or is cut off by a
     # backstop limit, still ran.
     episode.shell_commands.append(command)
+    episode.shell_evidence.append({"complete": False, "events": []})
     hooks.command_recorded(episode)
     observation = await shell.run(command, budget)
-    after = _record_evidence.snapshot(await snapshot_output(shell.sandbox))
-    change = _record_evidence.delta(shell.prior_snapshot, after)
-    shell.prior_snapshot = after
-    episode.steps.append({"command_index": len(episode.shell_commands) - 1,
-                                    **shell.last_execution, **change,
-                                    "observed_stdout": observation.get("stdout", "")})
+    episode.shell_evidence[-1] = copy.deepcopy(shell.last_evidence)
+    hooks.command_recorded(episode)
     return observation, False
 
 
 async def run_episode(prompt: str, sandbox: Sandbox, client: Client, model: str,
-                      seconds: float, hooks: Hooks | None = None, *,
+                      seconds: float | None = None, hooks: Hooks | None = None, *,
                       backend: str = "anthropic", effort: str = REASONING_EFFORT,
                       provider: str = "Anthropic") -> Episode:
-    """One model call, one executed action, until terminal or deadline."""
+    """One model call, one executed action, until terminal or an explicit deadline."""
     hooks = hooks or Hooks()
     shell = Shell(sandbox)
     episode = Episode(model=model, backend=backend, effort=effort)
     target_records = await shell.count_input()
     start = time.monotonic()
-    deadline = start + seconds
+    deadline = math.inf if seconds is None else start + float(seconds)
     episode.messages = [{"role": "user", "content": [
         {"type": "text", "text": prompt},
         {"type": "text", "text": "Initial environment observation (data):\n"
@@ -445,7 +501,7 @@ async def run_episode(prompt: str, sandbox: Sandbox, client: Client, model: str,
             trace: dict = {"index": len(episode.calls) + 1, "timeout_seconds": timeout}
             started = time.monotonic()
             response = None
-            with anyio.move_on_after(remaining) as scope:
+            with anyio.move_on_after(None if seconds is None else remaining) as scope:
                 try:
                     result = await client(payload, timeout)
                     if isinstance(result, ProviderReply):
@@ -492,6 +548,10 @@ async def run_episode(prompt: str, sandbox: Sandbox, client: Client, model: str,
                 break
             if action["origin"] == "provider_refusal":
                 episode.stop_reason = "provider_refusal"
+                break
+            if action["origin"] == "provider_text":
+                episode.final_response = action["final_response"][:MAX_FINAL_RESPONSE_CHARS]
+                episode.stop_reason = "end_turn"
                 break
             observation, terminal = await step(shell, episode, action, deadline - time.monotonic(), hooks)
             progress = None

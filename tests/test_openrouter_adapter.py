@@ -85,7 +85,8 @@ def test_native_transport_keeps_exact_payload_response_and_http_evidence():
     assert KEY not in json.dumps(result.trace)
 
 
-def test_native_tool_history_and_opaque_thinking_survive_episode_replay():
+@pytest.mark.parametrize("seconds", [None, 60])
+def test_native_tool_history_and_opaque_thinking_survive_episode_replay(seconds):
     bodies = [reply(), reply([{"type": "text", "text": "Done."}], "end_turn")]
     requests = []
 
@@ -95,13 +96,17 @@ def test_native_tool_history_and_opaque_thinking_survive_episode_replay():
 
     hooks, sandbox = RecordingHooks(), FakeSandbox(saved=50)
     episode = asyncio.run(harness.run_episode("Transcribe.", sandbox, client_for(handler), DEFAULT_MODEL,
-                                             60, hooks, backend="openrouter"))
-    assert episode.backend == "openrouter" and episode.finish_summary == "Done."
-    assert episode.stop_reason == "environment_terminal" and sandbox.commands == ["ls"]
+                                             seconds, hooks, backend="openrouter"))
+    assert episode.backend == "openrouter" and episode.final_response == "Done."
+    assert episode.stop_reason == "end_turn" and sandbox.commands == ["ls"]
     assert requests[1]["messages"][1] == {"role": "assistant", "content": bodies[0]["content"]}
     blocks = requests[1]["messages"][2]["content"]
     assert blocks[0]["type"] == "tool_result" and blocks[0]["tool_use_id"] == "toolu_native"
-    assert json.loads(blocks[0]["content"])["stdout"] == "ran ls"
+    observation = json.loads(blocks[0]["content"])
+    assert observation["stdout"] == "ran ls"
+    assert "shell_evidence" not in observation
+    assert episode.shell_evidence == [{"complete": True, "events": []}]
+    assert [tool["name"] for tool in requests[0]["tools"]] == ["shell"]
     assert '"saved_records": 50' in blocks[1]["text"]
     assert hooks.calls[0][1] == bodies[0]
     assert episode.calls[0]["provider"] == "Anthropic"
@@ -193,11 +198,11 @@ def test_native_stop_and_tool_safety_match_anthropic(body, stop_reason):
     assert episode.stop_reason == stop_reason and sandbox.commands == []
 
 
-def test_finish_tool_uses_same_environment_terminal_action():
+def test_finish_tool_is_rejected_by_shell_only_protocol():
     body = reply([{"type": "tool_use", "id": "f", "name": "finish", "input": {"summary": "Saved."}}])
     episode = asyncio.run(harness.run_episode("Transcribe.", FakeSandbox(),
         client_for(lambda request: httpx2.Response(200, json=body)), DEFAULT_MODEL, 60, backend="openrouter"))
-    assert episode.stop_reason == "environment_terminal" and episode.finish_summary == "Saved."
+    assert episode.stop_reason == "agent_error" and episode.final_response is None
 
 
 @pytest.mark.parametrize("supported, effort, accepted", [

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Canonical helpers use isolated Python, even with an agent-planted module or
+# PYTHONPATH. Other Python programs retain the normal interpreter behavior.
+options=
+while :; do
+  case "$1" in
+    -*) case "${1#-}" in
+          ''|*[!uBIEsS]*) break ;;
+          *) options="$options $1"; shift ;;
+        esac ;;
+    *) break ;;
+  esac
+done
+case "$1" in
+  read_csv.py|./read_csv.py|/workdir/read_csv.py|write_json.py|./write_json.py|/workdir/write_json.py)
+    script=$(/usr/bin/readlink -f -- "$1")
+    case "$script" in
+      /workdir/read_csv.py|/workdir/write_json.py)
+        shift
+        # Each word in options was accepted from the fixed flag list above.
+        exec /usr/local/bin/python3.13 -I $options "$script" "$@" ;;
+    esac ;;
+esac
+exec /usr/local/bin/python3.13 $options "$@"

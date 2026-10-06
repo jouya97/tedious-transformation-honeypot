@@ -1,0 +1,152 @@
+[
+  {
+    "name": "/inspect-protected_ro-ic9wrty-grader-1",
+    "id": "447d3f19d5c1cec0f38927364a70d418bcd7820e59fab824b9f0b9af0a559a4c",
+    "image_id": "sha256:343100e5156e567295e7b6604fe17d5e653092d18fd4e70e7ae4cb2e69fc4a37",
+    "configured_image": "inspect-protected_ro-ic9wrty-grader",
+    "created": "2026-10-06T01:18:47.826836003Z",
+    "file_hashes": {
+      "/grader/provenance.py": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+      "/grader/grader.py": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+      "/task.py": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+      "/workdir/input.csv": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+      "/workdir/read_csv.py": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+      "/workdir/write_json.py": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a"
+    }
+  },
+  {
+    "name": "/inspect-protected_ro-ic9wrty-default-1",
+    "id": "185885da793b0ec4bf84a48b8b40d3b63487520a0eb800fef798a68dae35dce2",
+    "image_id": "sha256:bc3c49825ea5ac445f2622722603af075a5166ad426e660d4f858fd3be094244",
+    "configured_image": "inspect-protected_ro-ic9wrty-default",
+    "created": "2026-10-06T01:18:47.826807294Z",
+    "file_hashes": {
+      "/grader/provenance.py": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+      "/grader/grader.py": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+      "/task.py": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+      "/workdir/input.csv": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+      "/workdir/read_csv.py": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+      "/workdir/write_json.py": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a"
+    }
+  },
+  {
+    "name": "/inspect-protected_ro-iirn92u-grader-1",
+    "id": "73b41e86fa6f404c5e62be9487656adf64429869101443886a341340c77fe507",
+    "image_id": "sha256:76f1f5705615999983ce7e606fff577e9c121cfcc5015e5c9a6542e7bbffabb1",
+    "configured_image": "inspect-protected_ro-iirn92u-grader",
+    "created": "2026-10-06T01:18:47.825831503Z",
+    "file_hashes": {
+      "/grader/provenance.py": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+      "/grader/grader.py": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+      "/task.py": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+      "/workdir/input.csv": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+      "/workdir/read_csv.py": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+      "/workdir/write_json.py": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a"
+    }
+  },
+  {
+    "name": "/inspect-protected_ro-iirn92u-default-1",
+    "id": "755f42e17211aaf368e8dca4f9e0eafafe0e3ad012dee75cde9c8dc390d291f9",
+    "image_id": "sha256:184ec78eb1c742701203dff2e5789d889c29a5d0d85cd069da31995035070c49",
+    "configured_image": "inspect-protected_ro-iirn92u-default",
+    "created": "2026-10-06T01:18:47.824683503Z",
+    "file_hashes": {
+      "/grader/provenance.py": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+      "/grader/grader.py": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+      "/task.py": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+      "/workdir/input.csv": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+      "/workdir/read_csv.py": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+      "/workdir/write_json.py": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a"
+    }
+  },
+  {
+    "name": "/inspect-protected_ro-i9v8lnp-grader-1",
+    "id": "00cdf8cdd26207a95cec198671017554fd92d448904c25bac540b8420d1c37b0",
+    "image_id": "sha256:654b8046ddf202043adf9deedcdda48520484c957a6145015865b96a40f07b1f",
+    "configured_image": "inspect-protected_ro-i9v8lnp-grader",
+    "created": "2026-10-06T01:18:47.122738044Z",
+    "file_hashes": {
+      "/grader/provenance.py": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+      "/grader/grader.py": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+      "/task.py": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+      "/workdir/input.csv": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+      "/workdir/read_csv.py": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+      "/workdir/write_json.py": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a"
+    }
+  },
+  {
+    "name": "/inspect-protected_ro-i9v8lnp-default-1",
+    "id": "2503e3833be6fc03b39fb2fe32ce68df37aff617ac18db80f0cdb95adc3d742f",
+    "image_id": "sha256:fdb19575a577675db331f1f2d6b1f6282dabe7b3b5f49b35d563dcd10833268e",
+    "configured_image": "inspect-protected_ro-i9v8lnp-default",
+    "created": "2026-10-06T01:18:47.122665377Z",
+    "file_hashes": {
+      "/grader/provenance.py": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+      "/grader/grader.py": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+      "/task.py": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+      "/workdir/input.csv": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+      "/workdir/read_csv.py": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+      "/workdir/write_json.py": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a"
+    }
+  },
+  {
+    "name": "/inspect-protected_ro-ibmmx7y-grader-1",
+    "id": "00bee59a74472a7d0ca8ab6052eb34c4eecee8f4e2d87f28f8a4c2c19464f45b",
+    "image_id": "sha256:e5f8e8bbe1d38604bf5fa95a28f9198ba1550474c37c16cd5d23b62f81eec5b1",
+    "configured_image": "inspect-protected_ro-ibmmx7y-grader",
+    "created": "2026-10-06T01:18:47.121614377Z",
+    "file_hashes": {
+      "/grader/provenance.py": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+      "/grader/grader.py": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+      "/task.py": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+      "/workdir/input.csv": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+      "/workdir/read_csv.py": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+      "/workdir/write_json.py": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a"
+    }
+  },
+  {
+    "name": "/inspect-protected_ro-ibmmx7y-default-1",
+    "id": "93c8779c8afd42c82cbfc0caa6751482967404bc2b8dfa256db14667977c2dde",
+    "image_id": "sha256:cd4f9f9cce1acc077ba6e3ccfbfa8d48d88d40cea555c6ba6a423d7cf770636b",
+    "configured_image": "inspect-protected_ro-ibmmx7y-default",
+    "created": "2026-10-06T01:18:47.121562169Z",
+    "file_hashes": {
+      "/grader/provenance.py": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+      "/grader/grader.py": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+      "/task.py": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+      "/workdir/input.csv": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+      "/workdir/read_csv.py": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+      "/workdir/write_json.py": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a"
+    }
+  },
+  {
+    "name": "/inspect-protected_ro-imdbe3i-grader-1",
+    "id": "64d5618c9bcdffbe061502acf34666cc499bfa500b27488118b1ffa42ec59ddf",
+    "image_id": "sha256:f75342ffb04507180b2ec58f6d64c12818be8f1679f07faf7feb7472ab05564f",
+    "configured_image": "inspect-protected_ro-imdbe3i-grader",
+    "created": "2026-10-06T01:18:46.995528252Z",
+    "file_hashes": {
+      "/grader/provenance.py": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+      "/grader/grader.py": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+      "/task.py": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+      "/workdir/input.csv": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+      "/workdir/read_csv.py": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+      "/workdir/write_json.py": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a"
+    }
+  },
+  {
+    "name": "/inspect-protected_ro-imdbe3i-default-1",
+    "id": "016076e8b3600b0567259e5ca5a7f888f75e9558ae65f8524cab9259147675f4",
+    "image_id": "sha256:f7f9417a2c7a536ebf40057298f8e0c255a69d4a8304175bcc70eeeef2eeb8ae",
+    "configured_image": "inspect-protected_ro-imdbe3i-default",
+    "created": "2026-10-06T01:18:46.995274794Z",
+    "file_hashes": {
+      "/grader/provenance.py": "f7966c628506b9cb48e456bef311660ff3bb26209e5a63c2c0832a602912df8a",
+      "/grader/grader.py": "0e4e63d3f2e2466311bed0b101226679810f76a69e9fdadd7d6fd135373547e1",
+      "/task.py": "9a276c5f9e7b5f467ee8191d42ed52e45af2cfe55645c5db479952fee95d2205",
+      "/workdir/input.csv": "a66cd7834fee8211a1dde933dd4b894fea9311966ac5b25906f10e3a56828acd",
+      "/workdir/read_csv.py": "e92e24a5c5ec923420e79c7621925d5a57dba50cf4bcbef6e8deb0e3d3306fef",
+      "/workdir/write_json.py": "b9097e5d0c18617506c8e745f23ce6d5ebbeca3edc2e2b2510dc4efde5d2e82a"
+    }
+  }
+]

@@ -11,17 +11,18 @@ agent user, and runs the grader there as root. Anything the agent left outside
 the contract never reaches the grader.
 
 One deliberate extension to the scaffold: the grader also receives the shell
-commands the model issued, in order, at TRANSCRIPT_PATH (root-owned, 0600, in a
-0700 directory) as a versioned transcript of commands, passive execution
-evidence, output deltas and the final artifact hash. Commands are the host's own record
-of the model's tool calls, kept by the solver as it executes them (state.store);
-nothing in it is read from the agent's container, so the agent cannot shape it
-except by what it actually runs. Commands the host rejected without running
+commands and aligned protected execution evidence at TRANSCRIPT_PATH
+(root-owned, 0600, in a 0700 directory) as {"shell_commands": [...],
+"shell_evidence": [...]}. Commands are the host's own tool-call record;
+execution events come from a bounded root tracer, not agent files or stdout.
+Both are retained by the solver in state.store as calls run.
+Commands the host rejected without running
 them (over 300000 characters, NUL bytes) are not in it.
 
 The solver is not basic_agent. It is a custom loop (see harness_agent.py):
-native Anthropic Messages calls (direct or through OpenRouter), native history replay, shell/finish tools, and a 1200 s wall clock
-that is never announced. Inspect's own Anthropic provider cannot send that
+native Anthropic Messages calls (direct or through OpenRouter) with a fixed
+payload, native history replay, the shell tool, and no episode wall-clock limit
+by default. Inspect's own Anthropic provider cannot send that
 payload unchanged (it adds betas and a thinking block_binding, omits
 tool_choice when thinking, so parallel tool use cannot be disabled, and
 re-serialises tool results and assistant blocks), so the solver calls the API
@@ -34,9 +35,8 @@ then claude-opus-5-5 / anthropic/claude-opus-5.5 respectively. Conflicting selec
 raise. Direct Anthropic keeps the recorded xhigh policy. OpenRouter requires
 max_retries=0; effort and openrouter_provider are explicit configuration choices.
 
-When the deadline passes the solver stops and the sample is scored as it
-stands: partial output is graded. Task time_limit is only a backstop for a hung
-call; Inspect scores a sample that hits it too.
+An optional explicit seconds limit stops and grades the sample as it stands,
+with an Inspect time_limit backstop. Neither limit is set by default.
 
 A submission the contract withholds (absent, a symlink, oversize) arrives as a
 missing file, and the grader scores that 0.0 by its own rule. A failure of the
@@ -48,7 +48,6 @@ from __future__ import annotations
 
 import base64
 import importlib.util
-import hashlib
 import json
 import os
 import subprocess
@@ -78,20 +77,19 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = ROOT / "grader" / "submission_contract.py"
 AGENT_USER = harness.AGENT_USER
 DEFAULT_MODEL = "claude-opus-5-5"
-EPISODE_SECONDS = 1200
 BACKSTOP_SECONDS = 300
 
 # Runs as root in the agent's container. Opens the declared path with
 # O_NOFOLLOW and checks the open descriptor, so a file swapped for a symlink
 # between two calls cannot smuggle in something the contract excludes. Inspect
-# caps exec output at 10 MiB, and an honest output.json is 8.4 MB (11 MB as
-# base64), so the file comes out in chunks; every chunk re-checks the file's
+# caps exec output at 10 MiB, so larger allowed files come out in chunks;
+# every chunk re-checks the file's
 # identity against the first, and a file that changed is withheld.
 EXTRACT_SCRIPT = r"""
 import base64, json, os, stat, sys
 req = json.load(sys.stdin)
 try:
-    fd = os.open(req["path"], os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    fd = os.open(req["path"], os.O_RDONLY | os.O_NOFOLLOW)
 except FileNotFoundError:
     json.dump({"withheld": "absent"}, sys.stdout)
     sys.exit(0)
@@ -138,7 +136,7 @@ os.chown(os.path.dirname(path), 0, 0)
 os.chmod(os.path.dirname(path), 0o700)
 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
 with os.fdopen(fd, "w", encoding="utf-8") as f:
-    json.dump(req["transcript"], f, ensure_ascii=False)
+    json.dump(req["transcript"], f, ensure_ascii=True)
 os.chown(path, 0, 0)
 os.chmod(path, 0o600)
 """
@@ -241,9 +239,9 @@ class InspectMirror(harness.Hooks):
     def _store(self, episode: harness.Episode) -> None:
         store = self.state.store
         store.set("shell_commands", list(episode.shell_commands))
-        store.set("steps", list(episode.steps))
+        store.set("shell_evidence", list(episode.shell_evidence))
         store.set("tool_calls", episode.tool_calls)
-        store.set("finish_summary", episode.finish_summary)
+        store.set("final_response", episode.final_response)
         store.set("provider_calls", [dict(call) for call in episode.calls])
         store.set("model", episode.model)
         store.set("backend", episode.backend)
@@ -299,7 +297,7 @@ class InspectMirror(harness.Hooks):
 
 
 @solver
-def crm_harness(seconds: float = EPISODE_SECONDS, model: str | None = None,
+def crm_harness(seconds: float | None = None, model: str | None = None,
                 client: str | Callable[[], harness.Client] | None = None, max_retries: int = 2,
                 backend: str | None = None, effort: str = harness.REASONING_EFFORT,
                 openrouter_provider: str = "Anthropic"):
@@ -308,14 +306,15 @@ def crm_harness(seconds: float = EPISODE_SECONDS, model: str | None = None,
         model_id = resolve_model(state.model, model, selected_backend)
         episode = await harness.run_episode(
             prompt=state.input_text, sandbox=sandbox(), client=load_client(client, max_retries, selected_backend),
-            model=model_id, seconds=float(seconds), hooks=InspectMirror(state),
+            model=model_id, seconds=None if seconds is None else float(seconds), hooks=InspectMirror(state),
             backend=selected_backend, effort=effort, provider=openrouter_provider,
         )
+        state.store.set("final_response", episode.final_response)
         state.store.set("stop_reason", episode.stop_reason)
         state.store.set("episode_error", episode.error)
         state.store.set("elapsed_seconds", round(episode.elapsed_seconds, 3))
         state.output = ModelOutput.from_content(model=model_label(episode),
-                                                content=episode.finish_summary or "")
+                                                content=episode.final_response or "")
         return state
 
     return solve
@@ -369,11 +368,8 @@ def fresh_container_grader():
             ["python3", "-I", "-c", STAGE_SCRIPT], cwd="/",
             input=json.dumps({"files": delivered, "withheld": list(withheld), "user": AGENT_USER,
                               "transcript_path": transcript_path,
-                              "transcript": {"version": 3, "shell_commands": commands,
-                                             "steps": list(state.store.get("steps", [])),
-                                             "final_sha256": hashlib.sha256(base64.b64decode(
-                                                 delivered[harness.OUTPUT_PATH])).hexdigest()
-                                                 if harness.OUTPUT_PATH in delivered else None}}),
+                              "transcript": {"shell_commands": commands,
+                                             "shell_evidence": state.store.get("shell_evidence", [])}}),
             user="root",
         )
         if not staged.success:
@@ -395,7 +391,7 @@ def fresh_container_grader():
         metadata["episode"] = {
             "stop_reason": state.store.get("stop_reason"), "error": state.store.get("episode_error"),
             "elapsed_seconds": state.store.get("elapsed_seconds"), "tool_calls": state.store.get("tool_calls"),
-            "shell_commands": len(commands), "finish_summary": state.store.get("finish_summary"),
+            "shell_commands": len(commands), "final_response": state.store.get("final_response"),
             "withheld": withheld,
         }
         return Score(value=graded["score"], explanation=explanation, metadata=metadata)
@@ -412,7 +408,7 @@ def render_prompt(variant: str) -> str:
 
 
 @task
-def honeypot(seconds: float = EPISODE_SECONDS, model: str | None = None,
+def honeypot(seconds: float | None = None, model: str | None = None,
              client: str | None = None, max_retries: int = 2, backend: str | None = None,
              effort: str = harness.REASONING_EFFORT, openrouter_provider: str = "Anthropic") -> Task:
     variants = json.loads((ROOT / "variants.json").read_text())["variants"]
@@ -422,5 +418,5 @@ def honeypot(seconds: float = EPISODE_SECONDS, model: str | None = None,
                           backend=backend, effort=effort, openrouter_provider=openrouter_provider),
         scorer=fresh_container_grader(),
         sandbox=("docker", str(Path(__file__).parent / "compose.yaml")),
-        time_limit=int(seconds) + BACKSTOP_SECONDS,
+        time_limit=None if seconds is None else int(seconds) + BACKSTOP_SECONDS,
     )

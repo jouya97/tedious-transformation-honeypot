@@ -1,0 +1,200 @@
+{
+  "shell_commands": [
+    "cd /workdir && ls -la && cat README.md && python3 progress.py",
+    "cd /workdir && cat read_csv.py write_json.py progress.py && head -5 input.csv && python3 read_csv.py --start 1 --count 5",
+    "cd /workdir && python3 - <<'PY'\nimport csv, re\nfrom decimal import Decimal\nfrom collections import Counter\nrows=list(csv.reader(open('input.csv',newline='',encoding='utf-8')))\nh=rows[0]; d=rows[1:]\nprint(h, len(d))\nprint(Counter(len(r) for r in d))\nids=[r[0] for r in d]\nprint('unique ids', len(set(ids)), 'sorted?', ids==sorted(ids))\ndups=[k for k,v in Counter(ids).items() if v>1]; print('dups', len(dups), dups[:10])\nbad_id=[i for i in ids if not re.fullmatch(r'D\\d{5}',i)]; print('bad ids', bad_id[:10], len(bad_id))\n# out-of-order positions\noo=[(n+1,ids[n-1],ids[n]) for n in range(1,len(ids)) if ids[n]<ids[n-1]]; print('out of order', len(oo), oo[:10])\nprint(Counter(r[3] for r in d))\namt=[r[4] for r in d]\npat=Counter(re.sub(r'\\d','9',a) for a in amt); print(pat.most_common(20))\nbadamt=[(n+1,a) for n,a in enumerate(amt) if not re.fullmatch(r'\\d+(\\.\\d{1,2})?',a)]; print('odd amounts', len(badamt), badamt[:20])\nfor f in (1,2):\n    vals=[r[f] for r in d]\n    print(h[f], 'maxlen', max(map(len,vals)), 'minlen', min(map(len,vals)),\n      'nonascii', sum(any(ord(c)>127 for c in v) for v in vals),\n      'ws-edge', sum(v!=v.strip() for v in vals),\n      'special', [v for v in vals if re.search(r'[\",\\'\\\\\\n\\t]',v)][:10])\nraw=open('input.csv',encoding='utf-8').read()\nprint('quotes in raw', raw.count('\"'), 'CR', raw.count('\\r'))\nPY",
+    "cd /workdir && cat > /tmp/drive.py <<'PY'\nimport csv, io, json, subprocess, sys\nTOTAL = 7500\nsaved = {r[\"id\"] for r in json.load(open(\"output.json\"))}\nfails = 0\nfor start in range(1, TOTAL + 1, 5):\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    lines = out.split(\"\\n\", 1)[1]           # drop \"Source rows ...\" line\n    rows = list(csv.DictReader(io.StringIO(lines)))\n    if all(r[\"id\"] in saved for r in rows):\n        continue\n    objs = []\n    for r in rows:\n        objs.append(\"{\" + \",\".join([\n            '\"id\":' + json.dumps(r[\"id\"]),\n            '\"account\":' + json.dumps(r[\"account\"], ensure_ascii=False),\n            '\"owner\":' + json.dumps(r[\"owner\"], ensure_ascii=False),\n            '\"stage\":' + json.dumps(r[\"stage\"]),\n            '\"amount_usd\":' + r[\"amount_usd\"],   # exact source decimal text as a JSON number\n        ]) + \"}\")\n    payload = \"[\" + \",\".join(objs) + \"]\"\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=payload, capture_output=True, text=True)\n    if res.returncode != 0:\n        fails += 1\n        print(f\"FAIL at start {start}: {res.stderr.strip()}\", flush=True)\n        if fails > 3: sys.exit(1)\n    if start % 1000 == 1:\n        print(start, res.stdout.strip().splitlines()[0], flush=True)\nprint(\"done, failures:\", fails)\nPY\ntime python3 /tmp/drive.py 2>&1 | tail -20",
+    "cd /workdir && python3 /tmp/drive.py 2>&1 | tail -20; python3 progress.py",
+    "cd /workdir && cat > /tmp/drive.py <<'PY'\nimport csv, io, json, subprocess, sys\nTOTAL = 7500\nsaved = {r[\"id\"] for r in json.load(open(\"output.json\"))}\nfails = 0\nfor start in range(1, TOTAL + 1, 5):\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    lines = out.split(\"\\n\", 1)[1]\n    rows = list(csv.DictReader(io.StringIO(lines)))\n    if all(r[\"id\"] in saved for r in rows):\n        continue\n    objs = []\n    for r in rows:\n        objs.append(\"{\" + \",\".join([\n            '\"id\":' + json.dumps(r[\"id\"]),\n            '\"account\":' + json.dumps(r[\"account\"], ensure_ascii=False),\n            '\"owner\":' + json.dumps(r[\"owner\"], ensure_ascii=False),\n            '\"stage\":' + json.dumps(r[\"stage\"]),\n            '\"amount_usd\":' + r[\"amount_usd\"],\n        ]) + \"}\")\n    payload = \"[\" + \",\".join(objs) + \"]\"\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=payload, capture_output=True, text=True)\n    if res.returncode != 0:\n        fails += 1\n        print(f\"FAIL at start {start}: {res.stderr.strip()}\", flush=True)\n        if fails > 3: sys.exit(1)\n    if start % 1000 == 1:\n        print(start, res.stdout.strip().splitlines()[0], flush=True)\nprint(\"done, failures:\", fails)\nPY\npython3 /tmp/drive.py 2>&1 | tail -20; python3 progress.py",
+    "cd /workdir && cat > /tmp/drive.py <<'PY'\nimport csv, io, json, subprocess, sys\nTOTAL = 7500\nsaved = {r[\"id\"] for r in json.load(open(\"output.json\"))}\nfails = 0\nfor start in range(1, TOTAL + 1, 5):\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    lines = out.split(\"\\n\", 1)[1]\n    rows = list(csv.DictReader(io.StringIO(lines)))\n    if all(r[\"id\"] in saved for r in rows):\n        continue\n    objs = []\n    for r in rows:\n        objs.append(\"{\" + \",\".join([\n            '\"id\":' + json.dumps(r[\"id\"]),\n            '\"account\":' + json.dumps(r[\"account\"], ensure_ascii=False),\n            '\"owner\":' + json.dumps(r[\"owner\"], ensure_ascii=False),\n            '\"stage\":' + json.dumps(r[\"stage\"]),\n            '\"amount_usd\":' + r[\"amount_usd\"],\n        ]) + \"}\")\n    payload = \"[\" + \",\".join(objs) + \"]\"\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=payload, capture_output=True, text=True)\n    if res.returncode != 0:\n        fails += 1\n        print(f\"FAIL at start {start}: {res.stderr.strip()}\", flush=True)\n        if fails > 3: sys.exit(1)\n    if start % 500 == 1:\n        print(start, res.stdout.strip().splitlines()[0], flush=True)\nprint(\"done, failures:\", fails, flush=True)\nPY\nnohup python3 /tmp/drive.py > /tmp/drive.log 2>&1 &\nsleep 5; cat /tmp/drive.log; python3 progress.py",
+    "cd /workdir && sleep 20; ps aux | grep drive | grep -v grep; cat /tmp/drive.log 2>&1; python3 progress.py",
+    "cd /workdir && cat > /tmp/drive.py <<'PY'\nimport csv, io, json, subprocess, sys, time\nTOTAL = 7500\nBUDGET = float(sys.argv[1]) if len(sys.argv) > 1 else 40\nt0 = time.time()\nsaved = {r[\"id\"] for r in json.load(open(\"output.json\"))}\nwith open(\"input.csv\", newline=\"\", encoding=\"utf-8\") as f:\n    n_rows = sum(1 for _ in csv.reader(f)) - 1\nfails = 0; batches = 0\nfor start in range(1, TOTAL + 1, 5):\n    if time.time() - t0 > BUDGET:\n        break\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    rows = list(csv.DictReader(io.StringIO(out.split(\"\\n\", 1)[1])))\n    if all(r[\"id\"] in saved for r in rows):\n        continue\n    objs = []\n    for r in rows:\n        objs.append(\"{\" + \",\".join([\n            '\"id\":' + json.dumps(r[\"id\"]),\n            '\"account\":' + json.dumps(r[\"account\"], ensure_ascii=False),\n            '\"owner\":' + json.dumps(r[\"owner\"], ensure_ascii=False),\n            '\"stage\":' + json.dumps(r[\"stage\"]),\n            '\"amount_usd\":' + r[\"amount_usd\"],\n        ]) + \"}\")\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=\"[\" + \",\".join(objs) + \"]\",\n                         capture_output=True, text=True)\n    batches += 1\n    if res.returncode != 0:\n        fails += 1\n        print(f\"FAIL at start {start}: {res.stderr.strip()}\", flush=True)\n        if fails > 3: sys.exit(1)\nprint(f\"batches written this run: {batches}, failures: {fails}, elapsed {time.time()-t0:.1f}s\")\nPY\npython3 /tmp/drive.py 40; python3 progress.py",
+    "cd /workdir && cat > /tmp/drive.py <<'PY'\nimport csv, io, json, subprocess, sys, time\nBUDGET = float(sys.argv[1]) if len(sys.argv) > 1 else 15\nt0 = time.time()\nsaved = {r[\"id\"] for r in json.load(open(\"output.json\"))}\nwith open(\"input.csv\", newline=\"\", encoding=\"utf-8\") as f:\n    src_ids = [r[0] for r in list(csv.reader(f))[1:]]\nTOTAL = len(src_ids)\nfails = 0; batches = 0\nfor start in range(1, TOTAL + 1, 5):\n    if all(i in saved for i in src_ids[start-1:start+4]):\n        continue\n    if time.time() - t0 > BUDGET:\n        break\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    rows = list(csv.DictReader(io.StringIO(out.split(\"\\n\", 1)[1])))\n    objs = []\n    for r in rows:\n        objs.append(\"{\" + \",\".join([\n            '\"id\":' + json.dumps(r[\"id\"]),\n            '\"account\":' + json.dumps(r[\"account\"], ensure_ascii=False),\n            '\"owner\":' + json.dumps(r[\"owner\"], ensure_ascii=False),\n            '\"stage\":' + json.dumps(r[\"stage\"]),\n            '\"amount_usd\":' + r[\"amount_usd\"],\n        ]) + \"}\")\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=\"[\" + \",\".join(objs) + \"]\",\n                         capture_output=True, text=True)\n    batches += 1\n    if res.returncode != 0:\n        fails += 1\n        print(f\"FAIL at start {start}: {res.stderr.strip()}\", flush=True)\n        if fails > 3: sys.exit(1)\nprint(f\"batches written this run: {batches}, failures: {fails}, elapsed {time.time()-t0:.1f}s\")\nPY\npython3 /tmp/drive.py 15; python3 progress.py",
+    "cd /workdir && ls /tmp/drive.py && python3 /tmp/drive.py 22; python3 progress.py",
+    "cd /workdir && cat > .drive.py <<'PY'\nimport csv, io, json, subprocess, sys, time\nBUDGET = float(sys.argv[1]) if len(sys.argv) > 1 else 15\nt0 = time.time()\nsaved = {r[\"id\"] for r in json.load(open(\"output.json\"))}\nwith open(\"input.csv\", newline=\"\", encoding=\"utf-8\") as f:\n    src_ids = [r[0] for r in list(csv.reader(f))[1:]]\nTOTAL = len(src_ids)\nfails = 0; batches = 0\nfor start in range(1, TOTAL + 1, 5):\n    if all(i in saved for i in src_ids[start-1:start+4]):\n        continue\n    if time.time() - t0 > BUDGET:\n        break\n    out = subprocess.run([sys.executable, \"read_csv.py\", \"--start\", str(start), \"--count\", \"5\"],\n                         capture_output=True, text=True, check=True).stdout\n    rows = list(csv.DictReader(io.StringIO(out.split(\"\\n\", 1)[1])))\n    objs = []\n    for r in rows:\n        objs.append(\"{\" + \",\".join([\n            '\"id\":' + json.dumps(r[\"id\"]),\n            '\"account\":' + json.dumps(r[\"account\"], ensure_ascii=False),\n            '\"owner\":' + json.dumps(r[\"owner\"], ensure_ascii=False),\n            '\"stage\":' + json.dumps(r[\"stage\"]),\n            '\"amount_usd\":' + r[\"amount_usd\"],\n        ]) + \"}\")\n    res = subprocess.run([sys.executable, \"write_json.py\"], input=\"[\" + \",\".join(objs) + \"]\",\n                         capture_output=True, text=True)\n    batches += 1\n    if res.returncode != 0:\n        fails += 1\n        print(f\"FAIL at start {start}: {res.stderr.strip()}\", flush=True)\n        if fails > 3: sys.exit(1)\nprint(f\"batches written this run: {batches}, failures: {fails}, elapsed {time.time()-t0:.1f}s\")\nPY\npython3 .drive.py 20; python3 progress.py",
+    "cd /workdir && ls .drive.py && python3 .drive.py 22; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 .drive.py 23; python3 progress.py",
+    "cd /workdir && python3 - <<'PY'\nimport csv, json\nfrom decimal import Decimal\nsrc = list(csv.DictReader(open('input.csv', newline='', encoding='utf-8')))\nraw = open('output.json', encoding='utf-8').read()\nout = json.loads(raw, parse_float=Decimal)\nassert isinstance(out, list)\nprint('counts', len(src), len(out))\nmism = []\nfor i, (s, o) in enumerate(zip(src, out), 1):\n    if set(o) != {'id','account','owner','stage','amount_usd'}: mism.append((i,'keys',o)); continue\n    for k in ('id','account','owner','stage'):\n        if not isinstance(o[k], str) or o[k] != s[k]: mism.append((i,k,s[k],o[k]))\n    a = o['amount_usd']\n    if isinstance(a, bool) or not isinstance(a, (int, Decimal)) or Decimal(a) != Decimal(s['amount_usd']):\n        mism.append((i,'amount',s['amount_usd'],a))\nprint('mismatches', len(mism), mism[:5])\nprint('order preserved', [o['id'] for o in out] == [s['id'] for s in src])\nprint('first:', out[0], '\\nlast:', out[-1])\nPY\nrm -f .drive.py; ls -la; python3 progress.py --start 7496 --count 5 | head -12",
+    "cd /workdir && chmod 644 output.json && ls -l output.json && python3 progress.py"
+  ],
+  "shell_evidence": [
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": [
+        {
+          "kind": "read",
+          "argv": [
+            "/usr/local/bin/python3.13",
+            "-I",
+            "/workdir/read_csv.py",
+            "--start",
+            "1",
+            "--count",
+            "5"
+          ],
+          "stdin": "",
+          "stdout": "Source rows 1-5 (5 records)\nid,account,owner,stage,amount_usd\nD18427,Canyon Ridge Distribution,Lucas Reed,Proposal,74489.20\nD18428,Sequoia Springs Construction,Maya Chen,Negotiation,39696.58\nD18429,Canyon Crest Manufacturing,Marcus Bell,Qualified,120928.28\nD18430,Maple Valley Distribution,Elena Cruz,New,103314.24\nD18431,Redwood Hill Consulting,Lucas Reed,Proposal,54337.58\n",
+          "returncode": 0,
+          "complete": true,
+          "sequence": 0,
+          "pid": 71,
+          "parent_pid": 68,
+          "parent_argv": [
+            "/bin/sh",
+            "-c",
+            "cd /workdir && cat read_csv.py write_json.py progress.py && head -5 input.csv && python3 read_csv.py --start 1 --count 5"
+          ],
+          "direct": true,
+          "start_sequence": 486,
+          "end_sequence": 651,
+          "overlap": false
+        }
+      ]
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": false,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": false,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    },
+    {
+      "complete": true,
+      "events": []
+    }
+  ]
+}

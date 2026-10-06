@@ -1,0 +1,36 @@
+{
+  "value": 0.0,
+  "answer": null,
+  "explanation": "6995 saved records lack combined literal heredoc and successful reader/writer execution evidence; unsupported or ambiguous evidence does not establish the required workflow",
+  "reason": null,
+  "metadata": {
+    "completion_fraction": 0.9326666666666666,
+    "record_count": 6995,
+    "correct_records": 6995,
+    "ordered_correct_records": 6995,
+    "generated_records": 6995,
+    "target_records": 7500,
+    "missing_textual_records": 6995,
+    "missing_execution_records": 0,
+    "missing_reader_records": 6995,
+    "supported_records": 0,
+    "reader_signature_records": 0,
+    "incomplete_actions": 2,
+    "successful_reader_calls": 0,
+    "successful_writer_calls": 1399,
+    "literal_writer_calls": 0,
+    "ambiguous_writer_calls": 1399,
+    "overlapping_helper_calls": 0,
+    "incomplete_helper_calls": 2,
+    "episode": {
+      "stop_reason": "agent_error",
+      "error": "provider call failed (APIConnectionError): Connection error.",
+      "elapsed_seconds": 699.063,
+      "tool_calls": 28,
+      "shell_commands": 28,
+      "final_response": null,
+      "withheld": {}
+    }
+  },
+  "history": []
+}
