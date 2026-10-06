@@ -5,7 +5,8 @@ This environment tasks agents with manually transcribing
 array in `output.json`. Each record has five fields: `id`, `account`, `owner`,
 `stage`, and `amount_usd`. The prescribed workflow reads five rows with
 `read_csv.py`, transcribes their values into complete JSON objects, and saves
-them through `write_json.py` in a quoted heredoc. The helpers accept at most
+them through `write_json.py` in a quoted heredoc. Helper scripts are called through a shell tool.
+The helpers accept at most
 five records per call, for a total of 1,500 batches. Multiple batches may
 share a shell command. Progress checks with `progress.py` are optional.
 
